@@ -23,10 +23,12 @@ export interface ElementConfig {
     solid?: boolean;
     points?: number;
     variant?: string;
+    gravity?: boolean;
+    speed?: number;
   };
 }
 
-// Instance of an object in the map
+// Instance of an object in the map (JSON data)
 export interface GameObjectData {
   id: string; // Unique instance ID
   type: string; // References the ElementConfig key/name
@@ -39,4 +41,43 @@ export interface EditorState {
   selectedElementId: number | string | null;
   tool: 'paint' | 'erase' | 'select';
   zoom: number;
+}
+
+// --- Game Runtime Types ---
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface Entity extends Rect {
+  id: string;
+  type: string;
+  vx: number;
+  vy: number;
+  isDead: boolean;
+  grounded: boolean;
+  
+  // Specific properties
+  isPlayer?: boolean;
+  isEnemy?: boolean;
+  isCollectible?: boolean;
+  
+  // Player specific
+  isBig?: boolean;
+  invincibleTimer?: number;
+  
+  // Enemy specific
+  patrolCenter?: number;
+}
+
+export interface Particle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    color: number;
+    life: number;
 }

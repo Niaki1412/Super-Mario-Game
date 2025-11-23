@@ -5,6 +5,15 @@ export const DEFAULT_MAP_WIDTH = 20;
 export const DEFAULT_MAP_HEIGHT = 15;
 export const TOOL_ERASER = 'TOOL_ERASER';
 
+// Physics Constants
+export const GRAVITY = 0.5;
+export const TERMINAL_VELOCITY = 12;
+export const FRICTION = 0.8;
+export const ACCELERATION = 0.5;
+export const JUMP_FORCE = -10;
+export const JUMP_FORCE_BIG = -11; // Slightly higher jump when big? Or same.
+export const MOVE_SPEED = 4;
+
 // Tile IDs correspond to the integer in the 2D array
 // Object IDs are strings used in the "type" field
 export const GAME_ELEMENTS: ElementConfig[] = [
@@ -59,7 +68,7 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Goomba',
     category: 'enemy',
     color: 0xA0522D, // Sienna
-    attributes: { points: 100 }
+    attributes: { points: 100, gravity: true, speed: 1 }
   },
   {
     id: 102,
@@ -67,7 +76,7 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Coin',
     category: 'collectible',
     color: 0xFFFF00, // Yellow
-    attributes: { points: 50 }
+    attributes: { points: 50, gravity: false }
   },
   {
     id: 103,
@@ -75,7 +84,7 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Mushroom',
     category: 'collectible',
     color: 0xFF4500, // OrangeRed
-    attributes: { points: 1000 }
+    attributes: { points: 1000, gravity: true, speed: 2 }
   },
   {
     id: 104,
@@ -90,3 +99,7 @@ export const getElementById = (id: number | string | null): ElementConfig | unde
   if (id === null) return undefined;
   return GAME_ELEMENTS.find(el => el.id === id || el.name.toLowerCase() === String(id).toLowerCase());
 };
+
+export const getElementByName = (name: string): ElementConfig | undefined => {
+    return GAME_ELEMENTS.find(el => el.name.toLowerCase() === name.toLowerCase());
+}
