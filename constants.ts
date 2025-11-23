@@ -5,14 +5,9 @@ export const DEFAULT_MAP_WIDTH = 20;
 export const DEFAULT_MAP_HEIGHT = 15;
 export const TOOL_ERASER = 'TOOL_ERASER';
 
-// Physics Constants
+// World Physics Constants (Global)
 export const GRAVITY = 0.5;
 export const TERMINAL_VELOCITY = 12;
-export const FRICTION = 0.8;
-export const ACCELERATION = 0.5;
-export const JUMP_FORCE = -10;
-export const JUMP_FORCE_BIG = -11; // Slightly higher jump when big? Or same.
-export const MOVE_SPEED = 4;
 
 // Tile IDs correspond to the integer in the 2D array
 // Object IDs are strings used in the "type" field
@@ -32,7 +27,7 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Brick (Breakable)',
     category: 'terrain',
     color: 0xB22222, // FireBrick
-    attributes: { solid: true, destructible: true }
+    attributes: { solid: true, destructible: true, variant: 'brick' }
   },
   {
     id: 3,
@@ -40,7 +35,7 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Hard Block',
     category: 'terrain',
     color: 0x708090, // SlateGray
-    attributes: { solid: true, destructible: false }
+    attributes: { solid: true, destructible: false, variant: 'metal' }
   },
   {
     id: 4,
@@ -48,7 +43,7 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Question Block',
     category: 'collectible',
     color: 0xFFD700, // Gold
-    attributes: { solid: true, destructible: false }
+    attributes: { solid: true, destructible: false, variant: 'question' }
   },
   {
     id: 5,
@@ -56,12 +51,10 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Invisible Death Block',
     category: 'trigger',
     color: 0x800080, // Purple (visible in editor, invisible in game)
-    attributes: { solid: false, lethal: true }
+    attributes: { solid: false, lethal: true, variant: 'invisible' }
   },
 
   // --- OBJECTS (IDs 100+) ---
-  // Note: ID here is for selection purposes in the editor.
-  // In JSON, objects use string types.
   {
     id: 101,
     type: 'object',
@@ -84,7 +77,7 @@ export const GAME_ELEMENTS: ElementConfig[] = [
     name: 'Mushroom',
     category: 'collectible',
     color: 0xFF4500, // OrangeRed
-    attributes: { points: 1000, gravity: true, speed: 2 }
+    attributes: { points: 1000, gravity: true, speed: 2, variant: 'grow' }
   },
   {
     id: 104,

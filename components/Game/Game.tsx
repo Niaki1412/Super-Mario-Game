@@ -4,15 +4,12 @@ import { GameMap, Entity, Particle } from '../../types';
 import { 
     TILE_SIZE, 
     GRAVITY, 
-    JUMP_FORCE, 
-    MOVE_SPEED, 
-    FRICTION, 
-    ACCELERATION, 
+    TERMINAL_VELOCITY,
     getElementByName, 
     GAME_ELEMENTS,
-    TERMINAL_VELOCITY,
     getElementById
 } from '../../constants';
+import { PLAYER_CONFIG } from '../../playerConfig';
 
 interface GameProps {
   mapData: GameMap | null;
@@ -31,11 +28,11 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
   const scoreRef = useRef(0);
   const isGameOverRef = useRef(false);
   const isWonRef = useRef(false);
+  const lastDirRef = useRef(1); // 1 = right, -1 = left
 
   // React State for UI Overlay
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
-  const [gameWon, setGameWon] = useState(false);
   const [currentMap, setCurrentMap] = useState<GameMap | null>(initialMapData);
 
   // --- HELPERS ---
@@ -98,8 +95,8 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
         isGameOverRef.current = false;
         setGameOver(false);
         isWonRef.current = false;
-        setGameWon(false);
         particlesRef.current = [];
+        lastDirRef.current = 1;
 
         // Parse Objects & Create Entities
         const newEntities: Entity[] = [];
@@ -119,13 +116,14 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
             type: 'player',
             x: startX,
             y: startY,
-            w: TILE_SIZE * 0.8, // Slightly smaller hitbox
-            h: TILE_SIZE * 0.9,
+            w: PLAYER_CONFIG.small.width,
+            h: PLAYER_CONFIG.small.height,
             vx: 0,
             vy: 0,
             isDead: false,
             grounded: false,
-            isPlayer: true
+            isPlayer: true,
+            isBig: false
         });
 
         // Create Enemies & Items
@@ -179,6 +177,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
       const map = mapRef.current!;
       const entities = entitiesRef.current;
       const keys = keysRef.current;
+      const phys = PLAYER_CONFIG.physics;
 
       // Filter dead entities (except player, handled separately)
       entitiesRef.current = entities.filter(e => !e.isDead || e.isPlayer);
@@ -197,28 +196,34 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
           if (entity.isDead && !entity.isPlayer) return;
 
           // 1. Apply Gravity
-          entity.vy += GRAVITY * delta;
-          if (entity.vy > TERMINAL_VELOCITY) entity.vy = TERMINAL_VELOCITY;
+          entity.vy += phys.gravity * delta;
+          if (entity.vy > phys.terminalVelocity) entity.vy = phys.terminalVelocity;
 
           // 2. Control (Player)
           if (entity.isPlayer && !entity.isDead) {
               if (keys['ArrowLeft']) {
-                  entity.vx -= ACCELERATION * delta;
+                  entity.vx -= phys.acceleration * delta;
               } else if (keys['ArrowRight']) {
-                  entity.vx += ACCELERATION * delta;
+                  entity.vx += phys.acceleration * delta;
               } else {
-                  entity.vx *= FRICTION;
+                  entity.vx *= phys.friction;
+              }
+
+              // Update facing direction
+              if (Math.abs(entity.vx) > 0.1) {
+                  lastDirRef.current = Math.sign(entity.vx);
               }
 
               // Jump
               if (keys[' '] && entity.grounded) {
-                  entity.vy = JUMP_FORCE;
+                  const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
+                  entity.vy = force;
                   entity.grounded = false;
               }
 
               // Clamp Speed
-              if (entity.vx > MOVE_SPEED) entity.vx = MOVE_SPEED;
-              if (entity.vx < -MOVE_SPEED) entity.vx = -MOVE_SPEED;
+              if (entity.vx > phys.runSpeed) entity.vx = phys.runSpeed;
+              if (entity.vx < -phys.runSpeed) entity.vx = -phys.runSpeed;
 
               // Check Death fall
               if (entity.y > map.height * TILE_SIZE) {
@@ -228,8 +233,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
 
           // 3. AI Movement
           if (entity.isEnemy) {
-               // Simple patrol: turn around on walls
-               // Check next tile floor? (Optional, skipping for now)
+               // Simple patrol handled in collision
           }
 
 
@@ -254,21 +258,34 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
                           if (entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.5) {
                               // Kill Enemy
                               other.isDead = true;
-                              entity.vy = JUMP_FORCE * 0.5; // Bounce
+                              entity.vy = phys.bounceForce; // Bounce
                               addScore(100);
                               spawnParticles(other.x, other.y, 0xA0522D);
                           } else {
-                              // Kill Player
-                              die();
+                              // Damage logic
+                              if (entity.isBig) {
+                                  // Shrink
+                                  entity.isBig = false;
+                                  entity.h = PLAYER_CONFIG.small.height;
+                                  entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; // Adjust pos
+                                  // Invincibility would go here
+                              } else {
+                                  die();
+                              }
                           }
                       } else if (other.isCollectible) {
                           // Collect
                           other.isDead = true;
                           const config = getElementByName(other.type);
                           if (config?.attributes?.points) addScore(config.attributes.points);
-                          // Effect
-                          if (other.type === 'Mushroom') {
-                              // Grow logic (todo)
+                          
+                          // Effects
+                          if (config?.attributes?.variant === 'grow') {
+                              if (!entity.isBig) {
+                                  entity.isBig = true;
+                                  entity.h = PLAYER_CONFIG.big.height;
+                                  entity.y -= (PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height);
+                              }
                           }
                       }
                   }
@@ -320,6 +337,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
                           // Handle Destructible Bricks
                           const el = getElementById(tileId);
                           if (el?.attributes?.destructible && entity.isPlayer) {
+                              // Only break if Big? (Classic Mario rule, but let's allow all for now or check config)
                               map.tiles[y][x] = 0; // Destroy
                               addScore(10);
                               spawnParticles(tileRect.x, tileRect.y, el.color);
@@ -339,7 +357,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
       // Simple jump animation
       const player = entitiesRef.current.find(e => e.isPlayer);
       if (player) {
-          player.vy = JUMP_FORCE;
+          player.vy = PLAYER_CONFIG.small.jumpForce;
           player.isDead = true; 
       }
   };
@@ -364,6 +382,94 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
 
 
   // --- RENDERING ---
+
+  const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
+      const x = e.x;
+      const y = e.y;
+      const w = e.w;
+      const h = e.h;
+      const isBig = e.isBig;
+      
+      const isRight = lastDirRef.current > 0;
+      const colors = PLAYER_CONFIG.appearance;
+
+      // Helper to calculate X position based on direction
+      // If right: x + localX
+      // If left: x + w - localX - featureWidth
+      const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
+
+      const isRunning = Math.abs(e.vx) > 0.1 && e.grounded;
+      const tick = Date.now() / 150;
+      const animOffset = isRunning ? Math.sin(tick) * (w * 0.15) : 0;
+      
+      // Proportions vary slightly if big
+      const legH = isBig ? h * 0.2 : h * 0.25;
+      const bodyH = isBig ? h * 0.4 : h * 0.4;
+      const headH = isBig ? h * 0.25 : h * 0.35;
+      
+      // -- LEGS --
+      const legW = w * 0.25;
+      
+      // Back Leg
+      const blX = w * 0.2 + animOffset;
+      g.rect(tx(blX, legW), y + h - legH, legW, legH).fill(colors.overalls);
+      
+      // Front Leg
+      const flX = w * 0.55 - animOffset;
+      g.rect(tx(flX, legW), y + h - legH, legW, legH).fill(colors.overalls);
+
+      // -- BODY --
+      // Main Body
+      const bodyY = y + h - legH - bodyH;
+      g.rect(tx(w*0.2, w*0.6), bodyY, w*0.6, bodyH).fill(colors.overalls);
+      // Shirt (under overalls)
+      g.rect(tx(w*0.15, w*0.7), bodyY, w*0.7, bodyH * 0.6).fill(colors.shirt);
+      
+      // Overall Straps
+      g.rect(tx(w*0.2, w*0.15), bodyY, w*0.15, bodyH * 0.8).fill(colors.overalls);
+      g.rect(tx(w*0.65, w*0.15), bodyY, w*0.15, bodyH * 0.8).fill(colors.overalls);
+      
+      // Buttons
+      g.circle(tx(w*0.275, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
+      g.circle(tx(w*0.725, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
+
+      // -- ARMS --
+      const armY = bodyY + bodyH * 0.1;
+      // Back Arm
+      const baX = w * 0.1 + animOffset;
+      g.rect(tx(baX, w*0.2), armY, w*0.2, bodyH * 0.5).fill(colors.shirt);
+      // Front Arm
+      const faX = w * 0.7 - animOffset;
+      g.rect(tx(faX, w*0.2), armY, w*0.2, bodyH * 0.5).fill(colors.shirt);
+      // Hands
+      g.circle(tx(baX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
+      g.circle(tx(faX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
+
+      // -- HEAD --
+      const headSize = w * 0.75;
+      const headX = w * 0.125;
+      const headY = bodyY - headH;
+      
+      g.rect(tx(headX, headSize), headY, headSize, headH).fill(colors.skin);
+
+      // Hat
+      const hatH = headH * 0.4;
+      g.rect(tx(headX - w*0.05, headSize + w*0.1), headY - hatH*0.5, headSize + w*0.1, hatH + 2).fill(colors.hat);
+      // Hat Brim
+      g.rect(tx(w*0.45, w*0.5), headY, w*0.5, hatH * 0.5).fill(colors.hat);
+
+      // Hair
+      g.rect(tx(w*0.15, w*0.15), headY + headH*0.5, w*0.15, headH*0.3).fill(colors.hair); // Sideburn
+      g.rect(tx(w*0.1, w*0.1), headY + headH*0.6, w*0.1, headH*0.2).fill(colors.hair); // Back hair
+
+      // Face Features
+      // Mustache
+      g.rect(tx(w*0.55, w*0.3), headY + headH * 0.7, w*0.3, headH*0.2).fill(colors.hair);
+      // Nose
+      g.circle(tx(w*0.85, 0), headY + headH * 0.6, w*0.12).fill(colors.skin);
+      // Eye
+      g.rect(tx(w*0.6, w*0.08), headY + headH * 0.4, w*0.08, headH*0.25).fill(colors.eye);
+  };
 
   const render = (app: PIXI.Application) => {
       // Lazy approach: Clear and Redraw everything every frame (using Graphics).
@@ -410,14 +516,21 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
       entitiesRef.current.forEach(e => {
           if (e.isDead && !e.isPlayer) return; // Don't draw dead enemies
           
-          const config = getElementByName(e.type);
-          const color = e.isPlayer ? 0xFF0000 : (config?.color || 0xFFFFFF);
-          
-          g.rect(e.x, e.y, e.w, e.h).fill(color);
-          
-          // Face for player
           if (e.isPlayer) {
-              g.rect(e.x + (e.vx > 0 ? e.w*0.6 : e.w*0.1), e.y + e.h*0.2, e.w*0.3, e.h*0.2).fill(0xFFCCAA); // Face
+              drawPlayer(g, e);
+          } else {
+              const config = getElementByName(e.type);
+              const color = config?.color || 0xFFFFFF;
+              
+              // Draw Enemy/Item generic
+              g.rect(e.x, e.y, e.w, e.h).fill(color);
+              
+              // Simple detail for Goomba/etc if generic
+              if (e.isEnemy) {
+                   g.rect(e.x + e.w*0.2, e.y + e.h*0.6, e.w*0.6, e.h*0.1).fill(0x000000); // mouth
+                   g.circle(e.x + e.w*0.3, e.y + e.h*0.3, 3).fill(0xFFFFFF); // eye
+                   g.circle(e.x + e.w*0.7, e.y + e.h*0.3, 3).fill(0xFFFFFF);
+              }
           }
       });
 
