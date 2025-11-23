@@ -3,8 +3,6 @@ import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle } from '../../types';
 import { 
     TILE_SIZE, 
-    GRAVITY, 
-    TERMINAL_VELOCITY,
     getElementByName, 
     GAME_ELEMENTS,
     getElementById
@@ -87,6 +85,15 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
             containerRef.current.appendChild(app.canvas);
         }
         appRef.current = app;
+
+        // Setup Scene Layers
+        const graphics = new PIXI.Graphics();
+        graphics.label = 'game-graphics';
+        app.stage.addChild(graphics);
+        
+        const labels = new PIXI.Container();
+        labels.label = 'game-labels';
+        app.stage.addChild(labels);
 
         // Reset State
         mapRef.current = currentMap;
@@ -382,6 +389,95 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
 
 
   // --- RENDERING ---
+  
+  const drawGameElement = (g: PIXI.Graphics, labels: PIXI.Container, type: string, x: number, y: number, w: number, h: number, color: number) => {
+        switch (type) {
+            case 'Ground':
+                g.rect(x, y, w, h).fill(color);
+                g.moveTo(x, y).lineTo(x + w, y).stroke({ width: 4, color: 0x3E2723 });
+                g.moveTo(x + 4, y + 10).lineTo(x + 8, y + 6).lineTo(x + 12, y + 10).stroke({ width: 1.5, color: 0x000000, alpha: 0.2 });
+                g.moveTo(x + 20, y + 20).lineTo(x + 24, y + 16).lineTo(x + 28, y + 20).stroke({ width: 1.5, color: 0x000000, alpha: 0.2 });
+                break;
+
+            case 'Brick (Breakable)':
+                 g.rect(x, y, w, h).fill(color);
+                 g.moveTo(x, y + h/2).lineTo(x + w, y + h/2).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
+                 g.moveTo(x + w/2, y).lineTo(x + w/2, y + h/2).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
+                 g.moveTo(x + w/4, y + h/2).lineTo(x + w/4, y + h).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
+                 g.moveTo(x + w*0.75, y + h/2).lineTo(x + w*0.75, y + h).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
+                 break;
+
+            case 'Hard Block':
+                g.rect(x, y, w, h).fill(color);
+                g.rect(x + 4, y + 4, w - 8, h - 8).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
+                g.moveTo(x, y).lineTo(x + 4, y + 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
+                g.moveTo(x + w, y).lineTo(x + w - 4, y + 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
+                g.moveTo(x, y + h).lineTo(x + 4, y + h - 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
+                g.moveTo(x + w, y + h).lineTo(x + w - 4, y + h - 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
+                g.circle(x + 6, y + 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+                g.circle(x + w - 6, y + 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+                g.circle(x + 6, y + h - 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+                g.circle(x + w - 6, y + h - 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+                break;
+
+            case 'Question Block':
+                g.rect(x, y, w, h).fill(color);
+                g.circle(x + 4, y + 4, 2).fill({ color: 0x000000, alpha: 0.2 });
+                g.circle(x + w - 4, y + 4, 2).fill({ color: 0x000000, alpha: 0.2 });
+                g.circle(x + 4, y + h - 4, 2).fill({ color: 0x000000, alpha: 0.2 });
+                g.circle(x + w - 4, y + h - 4, 2).fill({ color: 0x000000, alpha: 0.2 });
+                // Add Text label
+                const t = new PIXI.Text({
+                    text: '?',
+                    style: { fontFamily: 'Arial', fontSize: 20, fontWeight: 'bold', fill: 0xFFF8E1 }
+                });
+                t.anchor.set(0.5);
+                t.x = x + w/2;
+                t.y = y + h/2;
+                labels.addChild(t);
+                break;
+            
+            case 'Invisible Death Block':
+                // Invisible in game
+                break;
+
+            case 'Goomba':
+                g.moveTo(x + w*0.2, y + h*0.7)
+                 .quadraticCurveTo(x + w*0.5, y - h*0.1, x + w*0.8, y + h*0.7)
+                 .lineTo(x + w*0.9, y + h*0.9)
+                 .lineTo(x + w*0.1, y + h*0.9)
+                 .fill(color);
+                 g.ellipse(x + w*0.3, y + h*0.95, 5, 3).fill(0x000000);
+                 g.ellipse(x + w*0.7, y + h*0.95, 5, 3).fill(0x000000);
+                 g.circle(x + w*0.35, y + h*0.45, 3).fill(0xFFFFFF);
+                 g.circle(x + w*0.65, y + h*0.45, 3).fill(0xFFFFFF);
+                 g.circle(x + w*0.37, y + h*0.45, 1).fill(0x000000);
+                 g.circle(x + w*0.63, y + h*0.45, 1).fill(0x000000);
+                break;
+                
+            case 'Coin':
+                g.ellipse(x + w/2, y + h/2, w*0.3, h*0.4).fill(color).stroke({ width: 2, color: 0xF57F17 });
+                g.ellipse(x + w/2, y + h/2, w*0.15, h*0.25).stroke({ width: 1, color: 0xFFF59D });
+                break;
+    
+            case 'Mushroom':
+                 g.moveTo(x + w*0.1, y + h*0.6)
+                    .quadraticCurveTo(x + w*0.5, y - h*0.2, x + w*0.9, y + h*0.6)
+                    .lineTo(x + w*0.1, y + h*0.6)
+                    .fill(color);
+                 g.circle(x + w*0.3, y + h*0.4, 3).fill(0xFFFFFF);
+                 g.circle(x + w*0.7, y + h*0.4, 3).fill(0xFFFFFF);
+                 g.circle(x + w*0.5, y + h*0.2, 4).fill(0xFFFFFF);
+                 g.rect(x + w*0.3, y + h*0.6, w*0.4, h*0.3).fill(0xFFE0B2);
+                 g.circle(x + w*0.4, y + h*0.75, 1).fill(0x000000);
+                 g.circle(x + w*0.6, y + h*0.75, 1).fill(0x000000);
+                 break;
+
+            default:
+                g.rect(x, y, w, h).fill(color);
+                g.rect(x, y, w, h).stroke({ width: 1, color: 0x000000, alpha: 0.2 });
+        }
+    };
 
   const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
       const x = e.x;
@@ -394,8 +490,6 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
       const colors = PLAYER_CONFIG.appearance;
 
       // Helper to calculate X position based on direction
-      // If right: x + localX
-      // If left: x + w - localX - featureWidth
       const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
 
       const isRunning = Math.abs(e.vx) > 0.1 && e.grounded;
@@ -410,38 +504,29 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
       // -- LEGS --
       const legW = w * 0.25;
       
-      // Back Leg
       const blX = w * 0.2 + animOffset;
       g.rect(tx(blX, legW), y + h - legH, legW, legH).fill(colors.overalls);
       
-      // Front Leg
       const flX = w * 0.55 - animOffset;
       g.rect(tx(flX, legW), y + h - legH, legW, legH).fill(colors.overalls);
 
       // -- BODY --
-      // Main Body
       const bodyY = y + h - legH - bodyH;
       g.rect(tx(w*0.2, w*0.6), bodyY, w*0.6, bodyH).fill(colors.overalls);
-      // Shirt (under overalls)
       g.rect(tx(w*0.15, w*0.7), bodyY, w*0.7, bodyH * 0.6).fill(colors.shirt);
       
-      // Overall Straps
       g.rect(tx(w*0.2, w*0.15), bodyY, w*0.15, bodyH * 0.8).fill(colors.overalls);
       g.rect(tx(w*0.65, w*0.15), bodyY, w*0.15, bodyH * 0.8).fill(colors.overalls);
       
-      // Buttons
       g.circle(tx(w*0.275, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
       g.circle(tx(w*0.725, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
 
       // -- ARMS --
       const armY = bodyY + bodyH * 0.1;
-      // Back Arm
       const baX = w * 0.1 + animOffset;
       g.rect(tx(baX, w*0.2), armY, w*0.2, bodyH * 0.5).fill(colors.shirt);
-      // Front Arm
       const faX = w * 0.7 - animOffset;
       g.rect(tx(faX, w*0.2), armY, w*0.2, bodyH * 0.5).fill(colors.shirt);
-      // Hands
       g.circle(tx(baX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
       g.circle(tx(faX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
 
@@ -452,33 +537,26 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
       
       g.rect(tx(headX, headSize), headY, headSize, headH).fill(colors.skin);
 
-      // Hat
       const hatH = headH * 0.4;
       g.rect(tx(headX - w*0.05, headSize + w*0.1), headY - hatH*0.5, headSize + w*0.1, hatH + 2).fill(colors.hat);
-      // Hat Brim
       g.rect(tx(w*0.45, w*0.5), headY, w*0.5, hatH * 0.5).fill(colors.hat);
 
-      // Hair
-      g.rect(tx(w*0.15, w*0.15), headY + headH*0.5, w*0.15, headH*0.3).fill(colors.hair); // Sideburn
-      g.rect(tx(w*0.1, w*0.1), headY + headH*0.6, w*0.1, headH*0.2).fill(colors.hair); // Back hair
+      g.rect(tx(w*0.15, w*0.15), headY + headH*0.5, w*0.15, headH*0.3).fill(colors.hair);
+      g.rect(tx(w*0.1, w*0.1), headY + headH*0.6, w*0.1, headH*0.2).fill(colors.hair);
 
-      // Face Features
-      // Mustache
       g.rect(tx(w*0.55, w*0.3), headY + headH * 0.7, w*0.3, headH*0.2).fill(colors.hair);
-      // Nose
       g.circle(tx(w*0.85, 0), headY + headH * 0.6, w*0.12).fill(colors.skin);
-      // Eye
       g.rect(tx(w*0.6, w*0.08), headY + headH * 0.4, w*0.08, headH*0.25).fill(colors.eye);
   };
 
   const render = (app: PIXI.Application) => {
-      // Lazy approach: Clear and Redraw everything every frame (using Graphics).
-      // For a real game, use Sprites and Containers.
+      const g = app.stage.getChildByLabel('game-graphics') as PIXI.Graphics;
+      const labels = app.stage.getChildByLabel('game-labels') as PIXI.Container;
       
-      const g = app.stage.children[0] as PIXI.Graphics || new PIXI.Graphics();
-      if (!app.stage.children.includes(g)) app.stage.addChild(g);
+      if (!g || !labels) return;
 
       g.clear();
+      labels.removeChildren();
 
       // Camera Follow
       const player = entitiesRef.current.find(e => e.isPlayer);
@@ -492,8 +570,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
       
       app.stage.position.x = -cameraX;
 
-      // Draw Map Tiles (Only visible ones optimization is implied by Pixi culling if using sprites, here we draw all or range)
-      // optimization: Draw only visible range
+      // Draw Map Tiles
       const startCol = Math.floor(cameraX / TILE_SIZE);
       const endCol = startCol + Math.ceil(window.innerWidth / TILE_SIZE) + 1;
 
@@ -504,9 +581,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
               if (tileId !== 0) {
                   const config = GAME_ELEMENTS.find(e => e.id === tileId);
                   if (config) {
-                      g.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE).fill(config.color);
-                      // Simple detail
-                      g.rect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE).stroke({width:1, color: 0x000000, alpha: 0.2});
+                      drawGameElement(g, labels, config.name, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, config.color);
                   }
               }
           }
@@ -514,23 +589,16 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
 
       // Draw Entities
       entitiesRef.current.forEach(e => {
-          if (e.isDead && !e.isPlayer) return; // Don't draw dead enemies
+          if (e.isDead && !e.isPlayer) return;
           
           if (e.isPlayer) {
               drawPlayer(g, e);
           } else {
               const config = getElementByName(e.type);
               const color = config?.color || 0xFFFFFF;
+              const name = config?.name || 'Unknown';
               
-              // Draw Enemy/Item generic
-              g.rect(e.x, e.y, e.w, e.h).fill(color);
-              
-              // Simple detail for Goomba/etc if generic
-              if (e.isEnemy) {
-                   g.rect(e.x + e.w*0.2, e.y + e.h*0.6, e.w*0.6, e.h*0.1).fill(0x000000); // mouth
-                   g.circle(e.x + e.w*0.3, e.y + e.h*0.3, 3).fill(0xFFFFFF); // eye
-                   g.circle(e.x + e.w*0.7, e.y + e.h*0.3, 3).fill(0xFFFFFF);
-              }
+              drawGameElement(g, labels, name, e.x, e.y, e.w, e.h, color);
           }
       });
 
