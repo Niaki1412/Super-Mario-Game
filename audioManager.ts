@@ -2,8 +2,8 @@
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
-  private bgmNodes: AudioNode[] = [];
   private isPlayingBGM: boolean = false;
+  private bgmTimeout: number | null = null;
 
   constructor() {
     try {
@@ -167,46 +167,78 @@ export class AudioManager {
     osc.stop(t + 0.5);
   }
 
-  // --- Background Music (Simple Loop) ---
+  // --- Background Music (Melodic Loop) ---
   
   startBGM() {
     if (!this.ctx || !this.masterGain || this.isPlayingBGM) return;
     this.resume();
     this.isPlayingBGM = true;
 
-    // Simple bassline loop
-    const bgmGain = this.ctx.createGain();
-    bgmGain.connect(this.masterGain);
-    bgmGain.gain.value = 0.3;
+    // Pleasant I-vi-IV-V Arpeggio Progression
+    // C Major 7 -> A Minor 7 -> F Major 7 -> G Dominant 7
+    const sequence = [
+        // C Maj 7
+        261.63, 329.63, 392.00, 493.88,
+        // A Min 7
+        220.00, 261.63, 329.63, 392.00,
+        // F Maj 7
+        174.61, 220.00, 261.63, 329.63,
+        // G Dom 7
+        196.00, 246.94, 293.66, 349.23
+    ];
 
-    const osc = this.ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
-    osc.connect(bgmGain);
-    osc.start();
-    
-    // Sequencer using LFO for rhythm
-    const lfo = this.ctx.createOscillator();
-    lfo.type = 'square';
-    lfo.frequency.value = 4; // Speed
-    const lfoGain = this.ctx.createGain();
-    lfoGain.gain.value = 1000; // Depth triggers on/off feel
-    lfo.connect(bgmGain.gain);
-    lfo.start();
+    let noteIndex = 0;
+    // Tempo control
+    const noteDuration = 0.3; // Seconds per note (Moderately relaxing tempo)
+    let nextNoteTime = this.ctx.currentTime;
 
-    // Store nodes to stop them later
-    this.bgmNodes = [osc, lfo, bgmGain, lfoGain];
+    const scheduler = () => {
+        if (!this.isPlayingBGM || !this.ctx || !this.masterGain) return;
+
+        // Schedule notes ahead of time to avoid jitter
+        while (nextNoteTime < this.ctx.currentTime + 0.1) {
+            this.playBGMNote(sequence[noteIndex], nextNoteTime, noteDuration);
+            nextNoteTime += noteDuration;
+            noteIndex = (noteIndex + 1) % sequence.length;
+        }
+        
+        // Check schedule again soon
+        this.bgmTimeout = window.setTimeout(scheduler, 50);
+    };
+
+    scheduler();
+  }
+
+  private playBGMNote(freq: number, time: number, duration: number) {
+      if (!this.ctx || !this.masterGain) return;
+
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      // Triangle wave provides a softer, flute-like tone than square waves
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+
+      // Soft Envelope (ADSR)
+      const volume = 0.15;
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(volume, time + 0.05); // Attack
+      gain.gain.setValueAtTime(volume, time + duration - 0.05); // Sustain
+      gain.gain.linearRampToValueAtTime(0, time + duration); // Release
+
+      osc.start(time);
+      osc.stop(time + duration);
   }
 
   stopBGM() {
-    this.bgmNodes.forEach((node) => {
-        try {
-            if (node instanceof OscillatorNode) node.stop();
-            node.disconnect();
-        } catch(e) {}
-    });
-    this.bgmNodes = [];
     this.isPlayingBGM = false;
+    if (this.bgmTimeout) {
+        clearTimeout(this.bgmTimeout);
+        this.bgmTimeout = null;
+    }
   }
 }
 
