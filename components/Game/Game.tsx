@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
@@ -5,6 +6,7 @@ import { GameMap, Entity, Particle } from '../../types';
 import { TILE_SIZE } from '../../constants';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
+import { audioManager } from '../../audioManager';
 
 export const Game: React.FC = () => {
   const navigate = useNavigate();
@@ -98,6 +100,9 @@ export const Game: React.FC = () => {
         particlesRef.current = [];
         lastDirRef.current = 1;
 
+        // Init Audio
+        audioManager.startBGM();
+
         // Parse Objects & Create Entities
         const newEntities: Entity[] = [];
         
@@ -167,6 +172,7 @@ export const Game: React.FC = () => {
         if (appRef.current) {
             appRef.current.destroy({ removeView: true });
         }
+        audioManager.stopBGM();
     };
   }, [currentMap]);
 
@@ -219,6 +225,7 @@ export const Game: React.FC = () => {
                   const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
                   entity.vy = force;
                   entity.grounded = false;
+                  audioManager.playJump();
               }
 
               // Clamp Speed
@@ -261,6 +268,7 @@ export const Game: React.FC = () => {
                               entity.vy = phys.bounceForce; // Bounce
                               addScore(100);
                               spawnParticles(other.x, other.y, 0xA0522D);
+                              audioManager.playStomp();
                           } else {
                               // Damage logic
                               if (entity.isBig) {
@@ -268,6 +276,7 @@ export const Game: React.FC = () => {
                                   entity.isBig = false;
                                   entity.h = PLAYER_CONFIG.small.height;
                                   entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; // Adjust pos
+                                  audioManager.playBump(); // Or a shrink sound
                                   // Invincibility would go here
                               } else {
                                   die();
@@ -286,6 +295,9 @@ export const Game: React.FC = () => {
                                   entity.h = PLAYER_CONFIG.big.height;
                                   entity.y -= (PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height);
                               }
+                              audioManager.playPowerup();
+                          } else {
+                              audioManager.playCoin();
                           }
                       }
                   }
@@ -341,6 +353,10 @@ export const Game: React.FC = () => {
                               map.tiles[y][x] = 0; // Destroy
                               addScore(10);
                               spawnParticles(tileRect.x, tileRect.y, el.color);
+                              audioManager.playBump(); // Break sound
+                          } else {
+                              // Hitting a solid block head-on
+                              if (entity.isPlayer) audioManager.playBump();
                           }
                       }
                   }
@@ -354,6 +370,9 @@ export const Game: React.FC = () => {
       if (isGameOverRef.current) return;
       isGameOverRef.current = true;
       setGameOver(true);
+      
+      audioManager.playDie();
+
       // Simple jump animation
       const player = entitiesRef.current.find(e => e.isPlayer);
       if (player) {
@@ -515,7 +534,11 @@ export const Game: React.FC = () => {
 
   // --- INPUT HANDLERS ---
   useEffect(() => {
-      const down = (e: KeyboardEvent) => keysRef.current[e.key] = true;
+      const down = (e: KeyboardEvent) => {
+          keysRef.current[e.key] = true;
+          // Try to resume audio context on first interaction
+          audioManager.resume();
+      };
       const up = (e: KeyboardEvent) => keysRef.current[e.key] = false;
       window.addEventListener('keydown', down);
       window.addEventListener('keyup', up);
