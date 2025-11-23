@@ -1,12 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle } from '../../types';
-import { 
-    TILE_SIZE, 
-    getElementByName, 
-    GAME_ELEMENTS,
-    getElementById
-} from '../../constants';
+import { TILE_SIZE } from '../../constants';
+import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 
 interface GameProps {
@@ -54,13 +50,13 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
 
   const isSolid = (tileId: number) => {
       if (tileId === 0) return false;
-      const el = GAME_ELEMENTS.find(e => e.id === tileId);
+      const el = GAME_ELEMENTS_REGISTRY.find(e => e.id === tileId);
       return el?.attributes?.solid || false;
   };
   
   const isLethalTile = (tileId: number) => {
       if (tileId === 0) return false;
-      const el = GAME_ELEMENTS.find(e => e.id === tileId);
+      const el = GAME_ELEMENTS_REGISTRY.find(e => e.id === tileId);
       return el?.attributes?.lethal || false;
   };
 
@@ -390,95 +386,6 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
 
   // --- RENDERING ---
   
-  const drawGameElement = (g: PIXI.Graphics, labels: PIXI.Container, type: string, x: number, y: number, w: number, h: number, color: number) => {
-        switch (type) {
-            case 'Ground':
-                g.rect(x, y, w, h).fill(color);
-                g.moveTo(x, y).lineTo(x + w, y).stroke({ width: 4, color: 0x3E2723 });
-                g.moveTo(x + 4, y + 10).lineTo(x + 8, y + 6).lineTo(x + 12, y + 10).stroke({ width: 1.5, color: 0x000000, alpha: 0.2 });
-                g.moveTo(x + 20, y + 20).lineTo(x + 24, y + 16).lineTo(x + 28, y + 20).stroke({ width: 1.5, color: 0x000000, alpha: 0.2 });
-                break;
-
-            case 'Brick (Breakable)':
-                 g.rect(x, y, w, h).fill(color);
-                 g.moveTo(x, y + h/2).lineTo(x + w, y + h/2).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
-                 g.moveTo(x + w/2, y).lineTo(x + w/2, y + h/2).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
-                 g.moveTo(x + w/4, y + h/2).lineTo(x + w/4, y + h).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
-                 g.moveTo(x + w*0.75, y + h/2).lineTo(x + w*0.75, y + h).stroke({ width: 2, color: 0x000000, alpha: 0.2 });
-                 break;
-
-            case 'Hard Block':
-                g.rect(x, y, w, h).fill(color);
-                g.rect(x + 4, y + 4, w - 8, h - 8).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
-                g.moveTo(x, y).lineTo(x + 4, y + 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
-                g.moveTo(x + w, y).lineTo(x + w - 4, y + 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
-                g.moveTo(x, y + h).lineTo(x + 4, y + h - 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
-                g.moveTo(x + w, y + h).lineTo(x + w - 4, y + h - 4).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
-                g.circle(x + 6, y + 6, 1.5).fill({color: 0x000000, alpha: 0.3});
-                g.circle(x + w - 6, y + 6, 1.5).fill({color: 0x000000, alpha: 0.3});
-                g.circle(x + 6, y + h - 6, 1.5).fill({color: 0x000000, alpha: 0.3});
-                g.circle(x + w - 6, y + h - 6, 1.5).fill({color: 0x000000, alpha: 0.3});
-                break;
-
-            case 'Question Block':
-                g.rect(x, y, w, h).fill(color);
-                g.circle(x + 4, y + 4, 2).fill({ color: 0x000000, alpha: 0.2 });
-                g.circle(x + w - 4, y + 4, 2).fill({ color: 0x000000, alpha: 0.2 });
-                g.circle(x + 4, y + h - 4, 2).fill({ color: 0x000000, alpha: 0.2 });
-                g.circle(x + w - 4, y + h - 4, 2).fill({ color: 0x000000, alpha: 0.2 });
-                // Add Text label
-                const t = new PIXI.Text({
-                    text: '?',
-                    style: { fontFamily: 'Arial', fontSize: 20, fontWeight: 'bold', fill: 0xFFF8E1 }
-                });
-                t.anchor.set(0.5);
-                t.x = x + w/2;
-                t.y = y + h/2;
-                labels.addChild(t);
-                break;
-            
-            case 'Invisible Death Block':
-                // Invisible in game
-                break;
-
-            case 'Goomba':
-                g.moveTo(x + w*0.2, y + h*0.7)
-                 .quadraticCurveTo(x + w*0.5, y - h*0.1, x + w*0.8, y + h*0.7)
-                 .lineTo(x + w*0.9, y + h*0.9)
-                 .lineTo(x + w*0.1, y + h*0.9)
-                 .fill(color);
-                 g.ellipse(x + w*0.3, y + h*0.95, 5, 3).fill(0x000000);
-                 g.ellipse(x + w*0.7, y + h*0.95, 5, 3).fill(0x000000);
-                 g.circle(x + w*0.35, y + h*0.45, 3).fill(0xFFFFFF);
-                 g.circle(x + w*0.65, y + h*0.45, 3).fill(0xFFFFFF);
-                 g.circle(x + w*0.37, y + h*0.45, 1).fill(0x000000);
-                 g.circle(x + w*0.63, y + h*0.45, 1).fill(0x000000);
-                break;
-                
-            case 'Coin':
-                g.ellipse(x + w/2, y + h/2, w*0.3, h*0.4).fill(color).stroke({ width: 2, color: 0xF57F17 });
-                g.ellipse(x + w/2, y + h/2, w*0.15, h*0.25).stroke({ width: 1, color: 0xFFF59D });
-                break;
-    
-            case 'Mushroom':
-                 g.moveTo(x + w*0.1, y + h*0.6)
-                    .quadraticCurveTo(x + w*0.5, y - h*0.2, x + w*0.9, y + h*0.6)
-                    .lineTo(x + w*0.1, y + h*0.6)
-                    .fill(color);
-                 g.circle(x + w*0.3, y + h*0.4, 3).fill(0xFFFFFF);
-                 g.circle(x + w*0.7, y + h*0.4, 3).fill(0xFFFFFF);
-                 g.circle(x + w*0.5, y + h*0.2, 4).fill(0xFFFFFF);
-                 g.rect(x + w*0.3, y + h*0.6, w*0.4, h*0.3).fill(0xFFE0B2);
-                 g.circle(x + w*0.4, y + h*0.75, 1).fill(0x000000);
-                 g.circle(x + w*0.6, y + h*0.75, 1).fill(0x000000);
-                 break;
-
-            default:
-                g.rect(x, y, w, h).fill(color);
-                g.rect(x, y, w, h).stroke({ width: 1, color: 0x000000, alpha: 0.2 });
-        }
-    };
-
   const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
       const x = e.x;
       const y = e.y;
@@ -579,9 +486,9 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
               if (x < 0 || x >= row.length) continue;
               const tileId = row[x];
               if (tileId !== 0) {
-                  const config = GAME_ELEMENTS.find(e => e.id === tileId);
+                  const config = GAME_ELEMENTS_REGISTRY.find(e => e.id === tileId);
                   if (config) {
-                      drawGameElement(g, labels, config.name, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, config.color);
+                      config.renderPixi(g, labels, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                   }
               }
           }
@@ -594,11 +501,12 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
           if (e.isPlayer) {
               drawPlayer(g, e);
           } else {
+              // Ensure we don't render invisible items in-game unless we want debug
               const config = getElementByName(e.type);
-              const color = config?.color || 0xFFFFFF;
-              const name = config?.name || 'Unknown';
               
-              drawGameElement(g, labels, name, e.x, e.y, e.w, e.h, color);
+              if (config && config.name !== 'Invisible Death Block') {
+                 config.renderPixi(g, labels, e.x, e.y, e.w, e.h);
+              }
           }
       });
 

@@ -3,7 +3,8 @@ import { AssetPalette } from './AssetPalette';
 import { PropertiesPanel } from './PropertiesPanel';
 import { MapCanvas } from './MapCanvas';
 import { GameMap, GameObjectData } from '../../types';
-import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, getElementById, TOOL_ERASER } from '../../constants';
+import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, TOOL_ERASER } from '../../constants';
+import { getElementById } from '../../elementRegistry';
 
 interface EditorProps {
     onExit: () => void;
