@@ -2,7 +2,7 @@
   "name": "Mario Map Editor",
   "description": "A web-based map editor for a Mario-style platformer using Pixi.js",
   "dependencies": {
-    "pixi.js": "^7.3.2",
+    "pixi.js": "^8.14.3",
     "lucide-react": "^0.292.0"
   },
   "requestFramePermissions": []

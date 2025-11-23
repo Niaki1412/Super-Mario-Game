@@ -21,43 +21,58 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const graphicsRef = useRef<PIXI.Graphics | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
 
+  // Keep a ref to the latest callback to avoid stale closures in Pixi event listeners
+  const onTileClickRef = useRef(onTileClick);
+  useEffect(() => {
+    onTileClickRef.current = onTileClick;
+  }, [onTileClick]);
+
   // Initialize Pixi
   useEffect(() => {
+    // Flag to track if the effect has been cleaned up (component unmounted)
     let isMounted = true;
+    let app: PIXI.Application | null = null;
 
     const initPixi = async () => {
-        if (!canvasRef.current) return;
-
-        // Cleanup existing if any
-        if (appRef.current) {
-             appRef.current.destroy({ removeView: true });
-             appRef.current = null;
+        // 1. Create Application
+        app = new PIXI.Application();
+        
+        // 2. Initialize (Async)
+        try {
+          await app.init({
+            width: mapData.width * TILE_SIZE,
+            height: mapData.height * TILE_SIZE,
+            backgroundColor: 0x333333, 
+            backgroundAlpha: 1,
+            resolution: window.devicePixelRatio || 1,
+            autoDensity: true,
+            preference: 'webgl',
+          });
+        } catch (error) {
+          console.error("Pixi Init failed", error);
+          return;
         }
 
-        const app = new PIXI.Application();
-        
-        await app.init({
-          width: mapData.width * TILE_SIZE,
-          height: mapData.height * TILE_SIZE,
-          backgroundColor: 0x333333, 
-          backgroundAlpha: 1,
-          resolution: window.devicePixelRatio || 1,
-          autoDensity: true,
-          preference: 'webgl',
-        });
-
+        // 3. Check if we should abort because component unmounted during await
         if (!isMounted) {
-            app.destroy();
+            if (app) {
+              await app.destroy({ removeView: true });
+            }
             return;
         }
 
+        // 4. Mount to DOM
         if (canvasRef.current) {
+            // Remove any existing children just in case
+            while (canvasRef.current.firstChild) {
+              canvasRef.current.removeChild(canvasRef.current.firstChild);
+            }
             canvasRef.current.appendChild(app.canvas);
         }
-        
+
         appRef.current = app;
 
-        // Create Main Graphics container
+        // 5. Setup Scene
         const graphics = new PIXI.Graphics();
         graphicsRef.current = graphics;
         app.stage.addChild(graphics);
@@ -75,7 +90,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         app.stage.on('pointerdown', (e) => {
             const { x, y } = getGridPos(e);
             const isRightClick = e.button === 2;
-            onTileClick(x, y, isRightClick);
+            onTileClickRef.current(x, y, isRightClick);
         });
 
         setIsAppReady(true);
@@ -83,27 +98,36 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     initPixi();
 
-    // Prevent context menu
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      setIsAppReady(false);
+      
+      // Cleanup DOM event listeners if any
+      // Cleanup Pixi App
+      if (appRef.current) {
+        // Destroy can be async in v8, but we generally fire and forget in cleanup 
+        // unless we need to wait. For React effects, we just call it.
+        appRef.current.destroy({ removeView: true });
+        appRef.current = null;
+        graphicsRef.current = null;
+      }
+    };
+  }, []); // Run once on mount
+
+  // Handle Context Menu (Right Click)
+  useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
     const currentCanvas = canvasRef.current;
     if (currentCanvas) {
         currentCanvas.addEventListener('contextmenu', handleContextMenu);
     }
-
     return () => {
-      isMounted = false;
-      if (currentCanvas) {
-          currentCanvas.removeEventListener('contextmenu', handleContextMenu);
-      }
-      if (appRef.current) {
-        appRef.current.destroy({ removeView: true });
-        appRef.current = null;
-        graphicsRef.current = null;
-        setIsAppReady(false);
-      }
+        if (currentCanvas) {
+            currentCanvas.removeEventListener('contextmenu', handleContextMenu);
+        }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, []);
 
   // Handle Resize updates
   useEffect(() => {
