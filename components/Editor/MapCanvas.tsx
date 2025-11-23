@@ -10,6 +10,8 @@ interface MapCanvasProps {
   onObjectClick: (objIndex: number) => void;
 }
 
+const RULER_OFFSET = 25; // Width of the ruler bar in pixels
+
 export const MapCanvas: React.FC<MapCanvasProps> = ({ 
   mapData, 
   selectedElementId,
@@ -19,6 +21,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const canvasRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const graphicsRef = useRef<PIXI.Graphics | null>(null);
+  const labelsContainerRef = useRef<PIXI.Container | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
 
   // Keep a ref to the latest callback to avoid stale closures in Pixi event listeners
@@ -29,19 +32,19 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
   // Initialize Pixi
   useEffect(() => {
-    // Flag to track if the effect has been cleaned up (component unmounted)
     let isMounted = true;
     let app: PIXI.Application | null = null;
 
     const initPixi = async () => {
-        // 1. Create Application
         app = new PIXI.Application();
         
-        // 2. Initialize (Async)
+        const totalWidth = mapData.width * TILE_SIZE + RULER_OFFSET;
+        const totalHeight = mapData.height * TILE_SIZE + RULER_OFFSET;
+
         try {
           await app.init({
-            width: mapData.width * TILE_SIZE,
-            height: mapData.height * TILE_SIZE,
+            width: totalWidth,
+            height: totalHeight,
             backgroundColor: 0x333333, 
             backgroundAlpha: 1,
             resolution: window.devicePixelRatio || 1,
@@ -53,7 +56,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           return;
         }
 
-        // 3. Check if we should abort because component unmounted during await
         if (!isMounted) {
             if (app) {
               await app.destroy({ removeView: true });
@@ -61,9 +63,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             return;
         }
 
-        // 4. Mount to DOM
         if (canvasRef.current) {
-            // Remove any existing children just in case
             while (canvasRef.current.firstChild) {
               canvasRef.current.removeChild(canvasRef.current.firstChild);
             }
@@ -72,23 +72,35 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
         appRef.current = app;
 
-        // 5. Setup Scene
+        // Setup Scene Layers
         const graphics = new PIXI.Graphics();
         graphicsRef.current = graphics;
         app.stage.addChild(graphics);
 
+        const labelsContainer = new PIXI.Container();
+        labelsContainerRef.current = labelsContainer;
+        app.stage.addChild(labelsContainer);
+
         // Interaction
         app.stage.eventMode = 'static';
-        app.stage.hitArea = new PIXI.Rectangle(0, 0, mapData.width * TILE_SIZE, mapData.height * TILE_SIZE);
+        app.stage.hitArea = new PIXI.Rectangle(0, 0, totalWidth, totalHeight);
 
         const getGridPos = (e: PIXI.FederatedPointerEvent) => {
-            const x = Math.floor(e.global.x / TILE_SIZE);
-            const y = Math.floor(e.global.y / TILE_SIZE);
+            // Adjust input coordinates by the Ruler Offset
+            const adjX = e.global.x - RULER_OFFSET;
+            const adjY = e.global.y - RULER_OFFSET;
+            
+            const x = Math.floor(adjX / TILE_SIZE);
+            const y = Math.floor(adjY / TILE_SIZE);
             return { x, y };
         };
 
         app.stage.on('pointerdown', (e) => {
             const { x, y } = getGridPos(e);
+            
+            // Ignore clicks on the ruler itself
+            if (x < 0 || y < 0) return;
+            
             const isRightClick = e.button === 2;
             onTileClickRef.current(x, y, isRightClick);
         });
@@ -98,24 +110,20 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
     initPixi();
 
-    // Cleanup function
     return () => {
       isMounted = false;
       setIsAppReady(false);
       
-      // Cleanup DOM event listeners if any
-      // Cleanup Pixi App
       if (appRef.current) {
-        // Destroy can be async in v8, but we generally fire and forget in cleanup 
-        // unless we need to wait. For React effects, we just call it.
         appRef.current.destroy({ removeView: true });
         appRef.current = null;
         graphicsRef.current = null;
+        labelsContainerRef.current = null;
       }
     };
   }, []); // Run once on mount
 
-  // Handle Context Menu (Right Click)
+  // Handle Context Menu
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
     const currentCanvas = canvasRef.current;
@@ -133,8 +141,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   useEffect(() => {
     if (appRef.current && isAppReady) {
         const app = appRef.current;
-        const newWidth = mapData.width * TILE_SIZE;
-        const newHeight = mapData.height * TILE_SIZE;
+        const newWidth = mapData.width * TILE_SIZE + RULER_OFFSET;
+        const newHeight = mapData.height * TILE_SIZE + RULER_OFFSET;
         
         if (app.renderer.width !== newWidth || app.renderer.height !== newHeight) {
             app.renderer.resize(newWidth, newHeight);
@@ -146,47 +154,95 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
   // Drawing Loop
   useEffect(() => {
-    if (!appRef.current || !graphicsRef.current || !isAppReady) return;
+    if (!appRef.current || !graphicsRef.current || !labelsContainerRef.current || !isAppReady) return;
 
     const g = graphicsRef.current;
-    g.clear();
+    const labels = labelsContainerRef.current;
 
-    // 1. Draw Grid
+    g.clear();
+    // Clear previous text labels
+    labels.removeChildren(); 
+
+    // Helper to draw text
+    const addLabel = (text: string, x: number, y: number, align: 'center' | 'right' = 'center') => {
+        const t = new PIXI.Text({
+            text,
+            style: {
+                fontFamily: 'Arial',
+                fontSize: 10,
+                fill: 0x999999,
+                align: align
+            }
+        });
+        t.x = x;
+        t.y = y;
+        t.anchor.set(align === 'center' ? 0.5 : 1, 0.5);
+        labels.addChild(t);
+    };
+
+    // --- 1. Draw Ruler Background ---
+    g.rect(0, 0, mapData.width * TILE_SIZE + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a); // Top
+    g.rect(0, 0, RULER_OFFSET, mapData.height * TILE_SIZE + RULER_OFFSET).fill(0x1a1a1a); // Left
+    
+    // --- 2. Draw Grid & Labels ---
+    
+    // Vertical Lines & Top Labels
     for (let x = 0; x <= mapData.width; x++) {
-      g.moveTo(x * TILE_SIZE, 0);
-      g.lineTo(x * TILE_SIZE, mapData.height * TILE_SIZE);
+      const xPos = x * TILE_SIZE + RULER_OFFSET;
+      g.moveTo(xPos, RULER_OFFSET);
+      g.lineTo(xPos, mapData.height * TILE_SIZE + RULER_OFFSET);
+      
+      // Draw label (skip last line for label if it matches width exactly)
+      if (x < mapData.width) {
+          addLabel(`${x}`, xPos + TILE_SIZE/2, RULER_OFFSET / 2);
+      }
     }
+
+    // Horizontal Lines & Left Labels
     for (let y = 0; y <= mapData.height; y++) {
-      g.moveTo(0, y * TILE_SIZE);
-      g.lineTo(mapData.width * TILE_SIZE, y * TILE_SIZE);
+      const yPos = y * TILE_SIZE + RULER_OFFSET;
+      g.moveTo(RULER_OFFSET, yPos);
+      g.lineTo(mapData.width * TILE_SIZE + RULER_OFFSET, yPos);
+
+      // Draw label
+      if (y < mapData.height) {
+          addLabel(`${y}`, RULER_OFFSET / 2, yPos + TILE_SIZE/2);
+      }
     }
     g.stroke({ width: 1, color: 0x555555, alpha: 0.5 });
 
-    // 2. Draw Tiles
+
+    // --- 3. Draw Tiles ---
     mapData.tiles.forEach((row, y) => {
       row.forEach((tileId, x) => {
         if (tileId !== 0) {
           const config = GAME_ELEMENTS.find(el => el.id === tileId);
           if (config) {
+            const drawX = x * TILE_SIZE + RULER_OFFSET;
+            const drawY = y * TILE_SIZE + RULER_OFFSET;
+
             // Fill
-            g.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            g.rect(drawX, drawY, TILE_SIZE, TILE_SIZE);
             g.fill(config.color);
             
             // Border
-            g.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            g.rect(drawX, drawY, TILE_SIZE, TILE_SIZE);
             g.stroke({ width: 2, color: 0x000000, alpha: 0.2 });
           }
         }
       });
     });
 
-    // 3. Draw Objects
+    // --- 4. Draw Objects ---
     mapData.objects.forEach((obj) => {
         const config = GAME_ELEMENTS.find(el => el.name.toLowerCase() === obj.type.toLowerCase() || (el.type === 'object' && el.name === obj.type));
         
         if (config) {
-            const cx = obj.x + TILE_SIZE / 2;
-            const cy = obj.y + TILE_SIZE / 2;
+            // Adjust object position by Offset
+            const cx = obj.x + TILE_SIZE / 2 + RULER_OFFSET;
+            const cy = obj.y + TILE_SIZE / 2 + RULER_OFFSET;
+            const drawX = obj.x + RULER_OFFSET;
+            const drawY = obj.y + RULER_OFFSET;
             
             if(config.category === 'enemy') {
                  g.circle(cx, cy, TILE_SIZE / 2.5);
@@ -196,12 +252,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
                      g.star(cx, cy, 4, TILE_SIZE / 3, TILE_SIZE/6);
                      g.fill(config.color);
                  } catch (e) {
-                     // Fallback if star not available in current graphics context
                      g.circle(cx, cy, TILE_SIZE / 4);
                      g.fill(config.color);
                  }
             } else {
-                 g.rect(obj.x + 4, obj.y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                 g.rect(drawX + 4, drawY + 4, TILE_SIZE - 8, TILE_SIZE - 8);
                  g.fill(config.color);
             }
         }
@@ -210,11 +265,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   }, [mapData, isAppReady]);
 
   return (
+    // Changed justify-center/items-center to m-auto logic to allow scrolling to (0,0) when overflowing
     <div 
-      className="flex-1 bg-gray-950 overflow-auto relative flex items-center justify-center min-h-0"
+      className="flex-1 bg-gray-950 overflow-auto relative flex"
       id="editor-canvas-container"
     >
-        <div className="p-10 min-w-min">
+        <div className="p-10 m-auto min-w-fit min-h-fit">
              <div ref={canvasRef} className="shadow-2xl border border-gray-800" />
         </div>
     </div>
