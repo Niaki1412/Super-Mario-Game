@@ -1,23 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { MainMenu } from './components/Menu/MainMenu';
 import { Editor } from './components/Editor/Editor';
 import { Game } from './components/Game/Game';
 
-type AppMode = 'menu' | 'editor' | 'game';
-
 const App: React.FC = () => {
-  const [mode, setMode] = useState<AppMode>('menu');
-
-  // Simple Router
-  switch (mode) {
-    case 'editor':
-      return <Editor onExit={() => setMode('menu')} />;
-    case 'game':
-      return <Game mapData={null} onExit={() => setMode('menu')} />; // Game handles map loading internally for now
-    case 'menu':
-    default:
-      return <MainMenu onSelectMode={setMode} />;
-  }
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/" element={<MainMenu />} />
+        <Route path="/editor" element={<Editor />} />
+        <Route path="/game" element={<Game />} />
+      </Routes>
+    </HashRouter>
+  );
 };
 
 export default App;

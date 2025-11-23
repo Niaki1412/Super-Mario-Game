@@ -1,11 +1,10 @@
 import React from 'react';
 import { Gamepad2, PenTool } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-interface MainMenuProps {
-  onSelectMode: (mode: 'editor' | 'game') => void;
-}
+export const MainMenu: React.FC = () => {
+  const navigate = useNavigate();
 
-export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-white">
       <div className="mb-12 text-center">
@@ -19,7 +18,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
         
         {/* Editor Card */}
         <button 
-          onClick={() => onSelectMode('editor')}
+          onClick={() => navigate('/editor')}
           className="group relative bg-gray-800 rounded-2xl p-8 hover:bg-gray-750 border-2 border-gray-700 hover:border-blue-500 transition-all duration-300 flex flex-col items-center hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/20"
         >
           <div className="bg-blue-900/30 p-6 rounded-full mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors text-blue-400">
@@ -33,7 +32,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectMode }) => {
 
         {/* Game Card */}
         <button 
-          onClick={() => onSelectMode('game')}
+          onClick={() => navigate('/game')}
           className="group relative bg-gray-800 rounded-2xl p-8 hover:bg-gray-750 border-2 border-gray-700 hover:border-red-500 transition-all duration-300 flex flex-col items-center hover:-translate-y-2 hover:shadow-2xl hover:shadow-red-500/20"
         >
           <div className="bg-red-900/30 p-6 rounded-full mb-6 group-hover:bg-red-600 group-hover:text-white transition-colors text-red-400">

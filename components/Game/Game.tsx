@@ -1,21 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle } from '../../types';
 import { TILE_SIZE } from '../../constants';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 
-interface GameProps {
-  mapData: GameMap | null;
-  onExit: () => void;
-}
-
-export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) => {
+export const Game: React.FC = () => {
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   
   // Game State Refs (for Loop)
-  const mapRef = useRef<GameMap | null>(initialMapData);
+  const mapRef = useRef<GameMap | null>(null);
   const entitiesRef = useRef<Entity[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const keysRef = useRef<Record<string, boolean>>({});
@@ -27,7 +24,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
   // React State for UI Overlay
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
-  const [currentMap, setCurrentMap] = useState<GameMap | null>(initialMapData);
+  const [currentMap, setCurrentMap] = useState<GameMap | null>(null);
 
   // --- HELPERS ---
 
@@ -553,7 +550,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
                   <input type="file" accept=".json" onChange={handleImportMap} className="hidden" />
               </label>
 
-              <button onClick={onExit} className="mt-12 text-gray-400 hover:text-white underline">
+              <button onClick={() => navigate('/')} className="mt-12 text-gray-400 hover:text-white underline">
                   Back to Menu
               </button>
           </div>
@@ -568,7 +565,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
         </div>
 
         <button 
-            onClick={onExit}
+            onClick={() => navigate('/')}
             className="absolute top-4 right-4 bg-gray-800/50 hover:bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 z-10 backdrop-blur-sm"
         >
             EXIT GAME
@@ -586,7 +583,7 @@ export const Game: React.FC<GameProps> = ({ mapData: initialMapData, onExit }) =
                         Try Again
                     </button>
                     <button 
-                        onClick={onExit}
+                        onClick={() => navigate('/')}
                         className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded shadow-lg"
                     >
                         Quit

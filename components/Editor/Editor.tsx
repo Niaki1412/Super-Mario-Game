@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AssetPalette } from './AssetPalette';
 import { PropertiesPanel } from './PropertiesPanel';
 import { MapCanvas } from './MapCanvas';
@@ -6,11 +7,9 @@ import { GameMap, GameObjectData } from '../../types';
 import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, TOOL_ERASER } from '../../constants';
 import { getElementById } from '../../elementRegistry';
 
-interface EditorProps {
-    onExit: () => void;
-}
+export const Editor: React.FC = () => {
+  const navigate = useNavigate();
 
-export const Editor: React.FC<EditorProps> = ({ onExit }) => {
   // --- State ---
   const [selectedElementId, setSelectedElementId] = useState<number | string | null>(1); // Default to Ground
   const [mapData, setMapData] = useState<GameMap>({
@@ -139,7 +138,7 @@ export const Editor: React.FC<EditorProps> = ({ onExit }) => {
       {/* Center: Canvas */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
           <div className="absolute top-4 left-4 z-50">
-             <button onClick={onExit} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded shadow border border-gray-600">
+             <button onClick={() => navigate('/')} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded shadow border border-gray-600">
                 ← Back to Menu
              </button>
           </div>
