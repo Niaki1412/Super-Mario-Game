@@ -1,13 +1,15 @@
 import React from 'react';
 import { GAME_ELEMENTS } from '../../constants';
 import { ElementConfig } from '../../types';
+import { Trash2 } from 'lucide-react';
 
 interface AssetPaletteProps {
   selectedId: number | string | null;
   onSelect: (id: number | string) => void;
+  onClearMap: () => void;
 }
 
-export const AssetPalette: React.FC<AssetPaletteProps> = ({ selectedId, onSelect }) => {
+export const AssetPalette: React.FC<AssetPaletteProps> = ({ selectedId, onSelect, onClearMap }) => {
   const categories = Array.from(new Set(GAME_ELEMENTS.map(e => e.category)));
 
   const renderAssetIcon = (element: ElementConfig) => {
@@ -161,6 +163,16 @@ export const AssetPalette: React.FC<AssetPaletteProps> = ({ selectedId, onSelect
       <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
         <span>🛠️ Assets</span>
       </h2>
+
+      <div className="mb-4">
+        <button 
+            onClick={onClearMap}
+            className="w-full flex items-center justify-center gap-2 bg-red-900/50 hover:bg-red-800 text-red-200 text-xs font-bold py-2 px-3 rounded border border-red-800 transition-colors"
+        >
+            <Trash2 size={14} />
+            CLEAR MAP
+        </button>
+      </div>
       
       <div className="flex-1">
         {categories.map(cat => renderCategory(cat))}

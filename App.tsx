@@ -85,6 +85,16 @@ const App: React.FC = () => {
     }
   }, [mapData, selectedElementId]);
 
+  const handleClearMap = () => {
+    if (window.confirm("Are you sure you want to clear the entire map? This cannot be undone.")) {
+      setMapData(prev => ({
+        ...prev,
+        tiles: Array(prev.height).fill(null).map(() => Array(prev.width).fill(0)),
+        objects: []
+      }));
+    }
+  };
+
   const handleExport = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mapData, null, 2));
     const downloadAnchorNode = document.createElement('a');
@@ -118,6 +128,7 @@ const App: React.FC = () => {
       <AssetPalette 
         selectedId={selectedElementId} 
         onSelect={setSelectedElementId} 
+        onClearMap={handleClearMap}
       />
 
       {/* Center: Canvas */}
