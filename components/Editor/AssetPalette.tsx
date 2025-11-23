@@ -1,7 +1,7 @@
 import React from 'react';
-import { GAME_ELEMENTS } from '../../constants';
+import { GAME_ELEMENTS, TOOL_ERASER } from '../../constants';
 import { ElementConfig } from '../../types';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Eraser } from 'lucide-react';
 
 interface AssetPaletteProps {
   selectedId: number | string | null;
@@ -164,13 +164,26 @@ export const AssetPalette: React.FC<AssetPaletteProps> = ({ selectedId, onSelect
         <span>🛠️ Assets</span>
       </h2>
 
-      <div className="mb-4">
+      <div className="space-y-2 mb-4">
         <button 
             onClick={onClearMap}
-            className="w-full flex items-center justify-center gap-2 bg-red-900/50 hover:bg-red-800 text-red-200 text-xs font-bold py-2 px-3 rounded border border-red-800 transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-red-900/30 hover:bg-red-900/50 text-red-200 text-xs font-bold py-2 px-3 rounded border border-red-900/50 transition-colors"
         >
             <Trash2 size={14} />
             CLEAR MAP
+        </button>
+
+        <button 
+            onClick={() => onSelect(TOOL_ERASER)}
+             className={`
+                w-full flex items-center justify-center gap-2 text-xs font-bold py-2 px-3 rounded border transition-colors
+                ${selectedId === TOOL_ERASER 
+                  ? 'bg-pink-600 text-white border-pink-500 shadow-[0_0_10px_rgba(219,39,119,0.5)]' 
+                  : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white'}
+              `}
+        >
+            <Eraser size={14} />
+            ERASER TOOL
         </button>
       </div>
       
@@ -179,8 +192,8 @@ export const AssetPalette: React.FC<AssetPaletteProps> = ({ selectedId, onSelect
       </div>
 
       <div className="mt-4 p-3 bg-gray-800 rounded text-xs text-gray-400">
-        <p>Select an item above, then click on the grid to place it.</p>
-        <p className="mt-1 text-gray-500">Right-click to erase.</p>
+        <p>Select an item above to paint.</p>
+        <p className="mt-1">Use the Eraser Tool or Right-Click to remove items.</p>
       </div>
     </div>
   );

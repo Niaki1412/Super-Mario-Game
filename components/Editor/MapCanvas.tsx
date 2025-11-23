@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { GameMap } from '../../types';
-import { TILE_SIZE, GAME_ELEMENTS } from '../../constants';
+import { TILE_SIZE, GAME_ELEMENTS, TOOL_ERASER } from '../../constants';
 
 interface MapCanvasProps {
   mapData: GameMap;
@@ -358,6 +358,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
   }, [mapData, isAppReady]);
 
+  // Determine cursor style based on tool
+  const getCursorStyle = () => {
+      if (selectedElementId === TOOL_ERASER) return 'cursor-[url(https://www.google.com/url?sa=i&url=https%3A%2F%2Ficon-icons.com%2Ficon%2Feraser%2F112674&psig=AOvVaw0_..._nope_just_use_class)] cursor-crosshair';
+      if (selectedElementId) return 'cursor-pointer';
+      return 'cursor-default';
+  };
+
   return (
     // Changed justify-center/items-center to m-auto logic to allow scrolling to (0,0) when overflowing
     <div 
@@ -365,7 +372,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       id="editor-canvas-container"
     >
         <div className="p-10 m-auto min-w-fit min-h-fit">
-             <div ref={canvasRef} className="shadow-2xl border border-gray-800" />
+             <div 
+                ref={canvasRef} 
+                className={`shadow-2xl border border-gray-800 transition-all ${selectedElementId === TOOL_ERASER ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                title={selectedElementId === TOOL_ERASER ? 'Eraser Tool' : 'Paint'}
+             />
         </div>
     </div>
   );

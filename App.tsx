@@ -3,7 +3,7 @@ import { AssetPalette } from './components/Editor/AssetPalette';
 import { PropertiesPanel } from './components/Editor/PropertiesPanel';
 import { MapCanvas } from './components/Editor/MapCanvas';
 import { GameMap, GameObjectData } from './types';
-import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, GAME_ELEMENTS, getElementById } from './constants';
+import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, GAME_ELEMENTS, getElementById, TOOL_ERASER } from './constants';
 
 const App: React.FC = () => {
   // --- State ---
@@ -43,8 +43,8 @@ const App: React.FC = () => {
   const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean) => {
     if (x < 0 || y < 0 || x >= mapData.width || y >= mapData.height) return;
 
-    if (isRightClick) {
-      // Erase Logic
+    // Erase Logic: Triggered by Right Click OR Eraser Tool
+    if (isRightClick || selectedElementId === TOOL_ERASER) {
       // 1. Remove tile
       const newTiles = [...mapData.tiles];
       newTiles[y] = [...newTiles[y]];

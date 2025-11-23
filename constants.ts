@@ -3,6 +3,7 @@ import { ElementConfig } from './types';
 export const TILE_SIZE = 32;
 export const DEFAULT_MAP_WIDTH = 20;
 export const DEFAULT_MAP_HEIGHT = 15;
+export const TOOL_ERASER = 'TOOL_ERASER';
 
 // Tile IDs correspond to the integer in the 2D array
 // Object IDs are strings used in the "type" field
