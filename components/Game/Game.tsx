@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
@@ -8,6 +7,13 @@ import { TILE_SIZE } from '../../constants';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
+
+const DEFAULT_CONTROLS = {
+    left: 'a',
+    right: 'd',
+    jump: ' ',
+    shoot: 'i'
+};
 
 export const Game: React.FC = () => {
   const navigate = useNavigate();
@@ -24,11 +30,15 @@ export const Game: React.FC = () => {
   const isWonRef = useRef(false);
   const lastDirRef = useRef(1); // 1 = right, -1 = left
 
-  // React State for UI Overlay
+  // React State for UI Overlay & Logic
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [gameWon, setGameWon] = useState(false);
   const [currentMap, setCurrentMap] = useState<GameMap | null>(null);
+  
+  // Controls State
+  const [controls, setControls] = useState(DEFAULT_CONTROLS);
+  const [bindingAction, setBindingAction] = useState<keyof typeof DEFAULT_CONTROLS | null>(null);
 
   // --- HELPERS ---
 
@@ -59,6 +69,20 @@ export const Game: React.FC = () => {
       if (tileId === 0) return false;
       const el = GAME_ELEMENTS_REGISTRY.find(e => e.id === tileId);
       return el?.attributes?.lethal || false;
+  };
+
+  // --- CONTROLS INIT ---
+  useEffect(() => {
+    const saved = localStorage.getItem('MARIO_CONTROLS');
+    if (saved) {
+        try { setControls(JSON.parse(saved)); } catch(e) {}
+    }
+  }, []);
+
+  const getKeyDisplay = (key: string) => {
+      if (key === ' ') return 'SPACE';
+      if (key.length === 1) return key.toUpperCase();
+      return key.toUpperCase();
   };
 
   // --- INITIALIZATION ---
@@ -132,7 +156,7 @@ export const Game: React.FC = () => {
             grounded: false,
             isPlayer: true,
             isBig: false,
-            canShoot: false, // Start without shooting ability
+            canShoot: false,
             hasGravity: true,
             invincibleTimer: 0,
             shootCooldown: 0
@@ -144,7 +168,6 @@ export const Game: React.FC = () => {
             const config = getElementByName(obj.type);
             if (!config) return;
 
-            // Handle Flagpole specifically to make it a tall hitbox
             let h = TILE_SIZE;
             let y = obj.y;
             
@@ -160,18 +183,17 @@ export const Game: React.FC = () => {
                 y: y,
                 w: TILE_SIZE,
                 h: h,
-                vx: config.category === 'enemy' ? -1 : 0, // Enemies start moving left
+                vx: config.category === 'enemy' ? -1 : 0, 
                 vy: 0,
                 isDead: false,
                 grounded: false,
                 isEnemy: config.category === 'enemy',
                 isCollectible: config.category === 'collectible',
                 patrolCenter: obj.x,
-                hasGravity: config.attributes?.gravity ?? true, // Default to true if not specified
+                hasGravity: config.attributes?.gravity ?? true,
                 text: obj.text,
-                isShell: false, // Init for Turtles
+                isShell: false,
                 
-                // Piranha Plant Init
                 plantState: 'hidden',
                 plantTimer: 0,
                 plantOffset: 0
@@ -183,7 +205,7 @@ export const Game: React.FC = () => {
         // --- GAME LOOP ---
         app.ticker.add((ticker) => {
             if (isGameOverRef.current || isWonRef.current || !mapRef.current) return;
-            const delta = ticker.deltaTime; // Normalized to 1 at 60fps
+            const delta = ticker.deltaTime;
 
             updatePhysics(delta);
             render(app);
@@ -209,21 +231,20 @@ export const Game: React.FC = () => {
       const keys = keysRef.current;
       const phys = PLAYER_CONFIG.physics;
 
-      // Filter dead entities (except player, handled separately)
-      // Also filter finished effects and bullets off screen
+      // Filter entities
       entitiesRef.current = entities.filter(e => {
           if (e.isDead && !e.isPlayer) return false;
-          if (e.isEffect && e.vy > 5) return false; // Effect coins
-          if (e.isBullet && (e.x < 0 || e.x > map.width * TILE_SIZE)) return false; // Bullets off screen
+          if (e.isEffect && e.vy > 5) return false; 
+          if (e.isBullet && (e.x < 0 || e.x > map.width * TILE_SIZE)) return false;
           return true;
       });
       
-      // Update Particles
+      // Particles
       for (let i = particlesRef.current.length - 1; i >= 0; i--) {
           const p = particlesRef.current[i];
           p.x += p.vx * delta;
           p.y += p.vy * delta;
-          p.vy += 0.2 * delta; // particle gravity
+          p.vy += 0.2 * delta; 
           p.life -= delta;
           if (p.life <= 0) particlesRef.current.splice(i, 1);
       }
@@ -231,26 +252,24 @@ export const Game: React.FC = () => {
       entitiesRef.current.forEach(entity => {
           if (entity.isDead && !entity.isPlayer) return;
 
-          // 1. Apply Gravity
+          // 1. Gravity
           if (entity.hasGravity) {
             entity.vy += phys.gravity * delta;
             if (entity.vy > phys.terminalVelocity) entity.vy = phys.terminalVelocity;
           }
 
-          // Visual Effects logic (Coins, etc.)
+          // Effects
           if (entity.isEffect) {
               entity.x += entity.vx * delta;
               entity.y += entity.vy * delta;
-              return; // Skip collision
+              return; 
           }
 
           // Bullet Logic
           if (entity.isBullet) {
               entity.x += entity.vx * delta;
               
-              // Check wall collision
-              const tx = Math.floor((entity.x + entity.w/2) / TILE_SIZE);
-              const ty = Math.floor((entity.y + entity.h/2) / TILE_SIZE);
+              // Wall collision
               const tile = getTileAt(entity.x + entity.w/2, entity.y + entity.h/2, map);
               if (isSolid(tile)) {
                   entity.isDead = true;
@@ -258,7 +277,7 @@ export const Game: React.FC = () => {
                   return;
               }
 
-              // Check Enemy Collision
+              // Enemy Collision
               entities.forEach(other => {
                   if (other === entity || other.isDead || !other.isEnemy) return;
                   if (checkRectCollision(entity, other)) {
@@ -266,49 +285,49 @@ export const Game: React.FC = () => {
                       other.isDead = true;
                       addScore(100);
                       spawnParticles(other.x, other.y, 0xFF4400);
-                      audioManager.playStomp(); // Or kick sound
+                      audioManager.playStomp(); 
                   }
               });
               return;
           }
 
-          // 2. Control (Player)
+          // 2. Control (Player) - USING DYNAMIC CONTROLS
           if (entity.isPlayer && !entity.isDead) {
-              if (keys['ArrowLeft']) {
+              if (keys[controls.left]) {
                   entity.vx -= phys.acceleration * delta;
-              } else if (keys['ArrowRight']) {
+              } else if (keys[controls.right]) {
                   entity.vx += phys.acceleration * delta;
               } else {
                   entity.vx *= phys.friction;
               }
 
-              // Update facing direction
+              // Facing
               if (Math.abs(entity.vx) > 0.1) {
                   lastDirRef.current = Math.sign(entity.vx);
               }
 
               // Jump
-              if (keys[' '] && entity.grounded) {
+              if (keys[controls.jump] && entity.grounded) {
                   const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
                   entity.vy = force;
                   entity.grounded = false;
                   audioManager.playJump();
               }
               
-              // Shoot (X Key)
-              if (keys['x'] || keys['X']) {
+              // Shoot
+              if (keys[controls.shoot]) {
                   if (entity.canShoot && (!entity.shootCooldown || entity.shootCooldown <= 0)) {
                       spawnBullet(entity);
-                      entity.shootCooldown = 20; // Cooldown frames
+                      entity.shootCooldown = 20; 
                   }
               }
               if (entity.shootCooldown && entity.shootCooldown > 0) {
                   entity.shootCooldown -= delta;
               }
 
-              // Invincibility Timer
+              // Invincibility
               if (entity.invincibleTimer && entity.invincibleTimer > 0) {
-                  entity.invincibleTimer -= delta / 60; // Approx seconds
+                  entity.invincibleTimer -= delta / 60; 
                   if (entity.invincibleTimer < 0) entity.invincibleTimer = 0;
               }
 
@@ -316,7 +335,7 @@ export const Game: React.FC = () => {
               if (entity.vx > phys.runSpeed) entity.vx = phys.runSpeed;
               if (entity.vx < -phys.runSpeed) entity.vx = -phys.runSpeed;
 
-              // Check Death fall
+              // Death fall
               if (entity.y > map.height * TILE_SIZE) {
                   die();
               }
@@ -324,18 +343,16 @@ export const Game: React.FC = () => {
 
           // 3. AI Movement & Shell Mechanics
           if (entity.isEnemy) {
-               // Piranha Plant Logic
                if (entity.type === 'Piranha Plant') {
-                   entity.vx = 0; // Stationary base
-                   entity.vy = 0; // Anchored
+                   entity.vx = 0; 
+                   entity.vy = 0; 
                    
-                   // State Machine
                    entity.plantTimer = (entity.plantTimer || 0) + delta;
                    const MAX_HEIGHT = -TILE_SIZE * 0.8;
                    const MOVE_SPEED = 0.5;
 
                    if (entity.plantState === 'hidden') {
-                       if (entity.plantTimer > 180) { // 3 seconds
+                       if (entity.plantTimer > 180) { 
                            entity.plantState = 'extending';
                            entity.plantTimer = 0;
                        }
@@ -361,9 +378,7 @@ export const Game: React.FC = () => {
                    }
                }
                
-               // Turtle / Generic AI
                else if (entity.isShell && Math.abs(entity.vx) > 2) {
-                   // Shell Killing Logic
                    entities.forEach(other => {
                        if (other === entity || other.isDead || other.isPlayer || other.isEffect || other.isBullet) return;
                        if (other.isEnemy && checkRectCollision(entity, other)) {
@@ -376,17 +391,16 @@ export const Game: React.FC = () => {
                }
           }
 
-
           // 4. Movement & Tile Collision (X Axis)
           entity.x += entity.vx * delta;
           handleTileCollision(entity, map, 'x');
 
           // 5. Movement & Tile Collision (Y Axis)
-          entity.grounded = false; // Assume in air until proven grounded
+          entity.grounded = false; 
           entity.y += entity.vy * delta;
           handleTileCollision(entity, map, 'y');
 
-          // 6. Entity vs Entity Collision (Player vs World)
+          // 6. Collision (Player vs World)
           if (entity.isPlayer && !entity.isDead) {
               entities.forEach(other => {
                   if (entity === other || other.isDead || other.isEffect || other.isBullet) return;
@@ -394,16 +408,12 @@ export const Game: React.FC = () => {
                   if (checkRectCollision(entity, other)) {
                       const config = getElementByName(other.type);
 
-                      // Win
                       if (config?.attributes?.win) {
                           winLevel();
                           return;
                       }
                       
-                      // Solid Objects (e.g. Pipe Base)
                       if (config?.attributes?.solid) {
-                         // Simple resolution: separate axis similar to tiles
-                         // Determine overlap
                          const dx = (entity.x + entity.w/2) - (other.x + other.w/2);
                          const dy = (entity.y + entity.h/2) - (other.y + other.h/2);
                          const width = (entity.w + other.w) / 2;
@@ -414,21 +424,17 @@ export const Game: React.FC = () => {
                          if (Math.abs(dx) <= width && Math.abs(dy) <= height) {
                              if (crossWidth > crossHeight) {
                                  if (crossWidth > -crossHeight) {
-                                     // Bottom collision (Head hits bottom of block)
                                      entity.y = other.y + other.h;
                                      entity.vy = 0;
                                  } else {
-                                     // Left collision
                                      entity.x = other.x - entity.w;
                                      entity.vx = 0;
                                  }
                              } else {
                                  if (crossWidth > -crossHeight) {
-                                     // Right collision
                                      entity.x = other.x + other.w;
                                      entity.vx = 0;
                                  } else {
-                                     // Top collision (Standing on block)
                                      entity.y = other.y - entity.h;
                                      entity.vy = 0;
                                      entity.grounded = true;
@@ -437,14 +443,10 @@ export const Game: React.FC = () => {
                          }
                       }
 
-                      // Interactable Enemies
                       if (other.isEnemy) {
-                          // Piranha Plant HEAD Check
                           if (other.type === 'Piranha Plant') {
                               const offset = other.plantOffset || 0;
-                              // Only lethal if plant is somewhat out
                               if (offset < -5) { 
-                                  // Head Rect (approx)
                                   const headRect = {
                                       x: other.x + other.w * 0.2,
                                       y: other.y + offset + other.h * 0.2,
@@ -455,11 +457,9 @@ export const Game: React.FC = () => {
                                        takeDamage(entity);
                                   }
                               }
-                              // Note: The base pipe collision is handled by 'solid' check above if config.solid is true
                               return;
                           }
 
-                          // Standard Stomp Check
                           const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
 
                           if (isStomp) {
@@ -472,10 +472,9 @@ export const Game: React.FC = () => {
                                       other.vx = 0;
                                       addScore(100);
                                   } else {
-                                      other.vx = 0; // Stop
+                                      other.vx = 0; 
                                   }
                               } else {
-                                  // Goomba
                                   other.isDead = true;
                                   entity.vy = phys.bounceForce; 
                                   addScore(100);
@@ -483,9 +482,7 @@ export const Game: React.FC = () => {
                                   audioManager.playStomp();
                               }
                           } else {
-                              // Side Collision
                               if (other.type === 'Turtle' && other.isShell && Math.abs(other.vx) < 0.1) {
-                                  // Kick
                                   const dir = entity.x < other.x ? 1 : -1;
                                   other.vx = dir * 8;
                                   other.x += dir * 4; 
@@ -495,7 +492,6 @@ export const Game: React.FC = () => {
                               }
                           }
                       } else if (other.isCollectible) {
-                          // Collect
                           other.isDead = true;
                           if (config?.attributes?.points) addScore(config.attributes.points);
                           
@@ -507,13 +503,12 @@ export const Game: React.FC = () => {
                               }
                               audioManager.playPowerup();
                           } else if (config?.attributes?.variant === 'fire') {
-                              // Fire Mushroom Logic
                               if (!entity.isBig) {
                                   entity.isBig = true;
                                   entity.h = PLAYER_CONFIG.big.height;
                                   entity.y -= (PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height);
                               }
-                              entity.canShoot = true; // Enable shooting
+                              entity.canShoot = true;
                               audioManager.playPowerup();
                           } else {
                               audioManager.playCoin();
@@ -549,7 +544,7 @@ export const Game: React.FC = () => {
       
       if (entity.isBig) {
           entity.isBig = false;
-          entity.canShoot = false; // Lose powerup
+          entity.canShoot = false; 
           entity.h = PLAYER_CONFIG.small.height;
           entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; 
           audioManager.playBump(); 
@@ -560,7 +555,6 @@ export const Game: React.FC = () => {
   };
 
   const handleTileCollision = (entity: Entity, map: GameMap, axis: 'x' | 'y') => {
-      // Calculate entity bounds in grid coords
       const startX = Math.floor(entity.x / TILE_SIZE);
       const endX = Math.floor((entity.x + entity.w - 0.01) / TILE_SIZE);
       const startY = Math.floor(entity.y / TILE_SIZE);
@@ -580,7 +574,6 @@ export const Game: React.FC = () => {
                   
                   if (axis === 'x') {
                       if (entity.vx > 0) {
-                          // Moving Right
                           entity.x = tileRect.x - entity.w;
                           if (entity.isEnemy) {
                               entity.vx = -entity.vx;
@@ -588,7 +581,6 @@ export const Game: React.FC = () => {
                               entity.vx = 0;
                           }
                       } else if (entity.vx < 0) {
-                          // Moving Left
                           entity.x = tileRect.x + tileRect.w;
                           if (entity.isEnemy) {
                               entity.vx = -entity.vx;
@@ -598,46 +590,39 @@ export const Game: React.FC = () => {
                       }
                   } else {
                       if (entity.vy > 0) {
-                          // Falling down
                           entity.y = tileRect.y - entity.h;
                           entity.vy = 0;
                           entity.grounded = true;
                       } else if (entity.vy < 0) {
-                          // Jumping up
                           entity.y = tileRect.y + tileRect.h;
                           entity.vy = 0;
                           
-                          // Check what we hit
                           const el = getElementById(tileId);
 
-                          // 1. Destructible Bricks
                           if (el?.attributes?.destructible && entity.isPlayer) {
-                              map.tiles[y][x] = 0; // Destroy
+                              map.tiles[y][x] = 0; 
                               addScore(10);
                               spawnParticles(tileRect.x, tileRect.y, el.color);
                               audioManager.playBump(); 
                           } 
-                          // 2. Question Blocks
                           else if (el?.name === 'Question Block' && entity.isPlayer) {
-                              // Swap to Empty Block
-                              map.tiles[y][x] = 6; // ID for Empty Block
+                              map.tiles[y][x] = 6; 
                               addScore(200);
                               audioManager.playCoin();
                               
-                              // Spawn floating coin effect
                               entitiesRef.current.push({
                                   id: `coin-fx-${Date.now()}`,
                                   type: 'Coin',
                                   x: tileRect.x,
-                                  y: tileRect.y - TILE_SIZE, // Start above
+                                  y: tileRect.y - TILE_SIZE, 
                                   w: TILE_SIZE,
                                   h: TILE_SIZE,
                                   vx: 0,
-                                  vy: -8, // Pop up
+                                  vy: -8, 
                                   isDead: false,
                                   grounded: false,
                                   hasGravity: true,
-                                  isEffect: true // Use effect flag
+                                  isEffect: true 
                               });
                           }
                           else {
@@ -658,7 +643,6 @@ export const Game: React.FC = () => {
       
       audioManager.playDie();
 
-      // Simple jump animation
       const player = entitiesRef.current.find(e => e.isPlayer);
       if (player) {
           player.vy = PLAYER_CONFIG.small.jumpForce;
@@ -695,7 +679,6 @@ export const Game: React.FC = () => {
   // --- RENDERING ---
   
   const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
-      // Invincibility Flicker
       if (e.invincibleTimer && e.invincibleTimer > 0) {
           if (Math.floor(Date.now() / 80) % 2 === 0) return;
       }
@@ -708,7 +691,6 @@ export const Game: React.FC = () => {
       const canShoot = e.canShoot;
       
       const isRight = lastDirRef.current > 0;
-      // Switch palette if shooting enabled
       const colors = canShoot ? PLAYER_CONFIG.fireAppearance : PLAYER_CONFIG.appearance;
 
       const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
@@ -805,7 +787,6 @@ export const Game: React.FC = () => {
               if (config && config.name !== 'Invisible Death Block') {
                  config.renderPixi(g, labels, e.x, e.y, e.w, e.h, e);
               } else if (e.isBullet) {
-                  // Fallback if bullet not in registry or just standard draw
                    const bulletConfig = getElementByName('Bullet');
                    if (bulletConfig) bulletConfig.renderPixi(g, null, e.x, e.y, e.w, e.h);
                    else g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
@@ -818,19 +799,40 @@ export const Game: React.FC = () => {
       });
   };
 
+  // --- INPUT & CONFIG ---
+
   useEffect(() => {
-      const down = (e: KeyboardEvent) => {
-          keysRef.current[e.key] = true;
-          audioManager.resume();
+      const handleKeyDown = (e: KeyboardEvent) => {
+          // Binding Logic
+          if (bindingAction) {
+              e.preventDefault();
+              const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+              const newControls = { ...controls, [bindingAction]: key };
+              setControls(newControls);
+              localStorage.setItem('MARIO_CONTROLS', JSON.stringify(newControls));
+              setBindingAction(null);
+              return;
+          }
+
+          // Game Input
+          const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+          keysRef.current[k] = true;
+          if (currentMap) audioManager.resume();
       };
-      const up = (e: KeyboardEvent) => keysRef.current[e.key] = false;
-      window.addEventListener('keydown', down);
-      window.addEventListener('keyup', up);
+
+      const handleKeyUp = (e: KeyboardEvent) => {
+          if (bindingAction) return;
+          const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+          keysRef.current[k] = false;
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
       return () => {
-          window.removeEventListener('keydown', down);
-          window.removeEventListener('keyup', up);
+          window.removeEventListener('keydown', handleKeyDown);
+          window.removeEventListener('keyup', handleKeyUp);
       };
-  }, []);
+  }, [bindingAction, controls, currentMap]); // Re-bind listener when binding state changes
 
   const handleImportMap = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -848,14 +850,38 @@ export const Game: React.FC = () => {
   if (!currentMap) {
       return (
           <div className="h-screen bg-gray-900 flex flex-col items-center justify-center text-white p-8">
-              <h2 className="text-3xl font-bold mb-8">Load a Map to Play</h2>
+              <h2 className="text-3xl font-bold mb-6">Load a Map to Play</h2>
               
-              <label className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded cursor-pointer transition-colors shadow-lg">
+              <label className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded cursor-pointer transition-colors shadow-lg mb-12">
                   Select JSON Map File
                   <input type="file" accept=".json" onChange={handleImportMap} className="hidden" />
               </label>
 
-              <button onClick={() => navigate('/')} className="mt-12 text-gray-400 hover:text-white underline">
+              {/* CONTROLS CONFIG UI */}
+              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 w-full max-w-lg">
+                  <h3 className="text-xl font-bold mb-4 text-center text-gray-300">Key Bindings</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                      {Object.entries(controls).map(([action, key]) => (
+                          <div key={action} className="flex flex-col">
+                              <span className="text-xs text-gray-500 uppercase font-bold mb-1">{action}</span>
+                              <button 
+                                  onClick={() => setBindingAction(action as keyof typeof DEFAULT_CONTROLS)}
+                                  className={`
+                                    py-2 px-4 rounded font-mono font-bold text-sm transition-colors
+                                    ${bindingAction === action 
+                                        ? 'bg-yellow-500 text-black animate-pulse' 
+                                        : 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-600'}
+                                  `}
+                              >
+                                  {bindingAction === action ? 'PRESS KEY...' : getKeyDisplay(key)}
+                              </button>
+                          </div>
+                      ))}
+                  </div>
+                  <p className="text-center text-xs text-gray-500 mt-4">Click a button to rebind.</p>
+              </div>
+
+              <button onClick={() => navigate('/')} className="mt-8 text-gray-400 hover:text-white underline">
                   Back to Menu
               </button>
           </div>
@@ -868,7 +894,7 @@ export const Game: React.FC = () => {
             SCORE: {score}
         </div>
         <div className="absolute top-10 left-4 text-white font-mono text-xs opacity-70 drop-shadow-md z-10 select-none">
-            CONTROLS: ARROWS to Move, SPACE to Jump, X to Shoot
+            CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} to Move, {getKeyDisplay(controls.jump)} to Jump, {getKeyDisplay(controls.shoot)} to Shoot
         </div>
 
         <button 
