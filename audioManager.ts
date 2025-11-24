@@ -1,4 +1,5 @@
 
+
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -118,6 +119,28 @@ export class AudioManager {
         osc.start(t + i * 0.08);
         osc.stop(t + i * 0.08 + 0.08);
     });
+  }
+
+  playShoot() {
+    if (!this.ctx || !this.masterGain) return;
+    this.resume();
+    
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+    
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    
+    osc.start(t);
+    osc.stop(t + 0.1);
   }
 
   playStomp() {

@@ -68,10 +68,13 @@ export interface Entity extends Rect {
   isEnemy?: boolean;
   isCollectible?: boolean;
   isEffect?: boolean;
+  isBullet?: boolean;
   
   // Player specific
   isBig?: boolean;
+  canShoot?: boolean;
   invincibleTimer?: number;
+  shootCooldown?: number;
   
   // Enemy specific
   patrolCenter?: number;

@@ -1,3 +1,4 @@
+
 import { TILE_SIZE } from './constants';
 
 export const PLAYER_CONFIG = {
@@ -9,6 +10,7 @@ export const PLAYER_CONFIG = {
         gravity: 0.5,
         terminalVelocity: 12,
         bounceForce: -5, // When jumping on enemies
+        bulletSpeed: 8,
     },
 
     // Form: Small Mario
@@ -27,11 +29,23 @@ export const PLAYER_CONFIG = {
         hitboxOffset: { x: 0, y: 0 }
     },
 
-    // Visual Palette
+    // Visual Palette (Normal)
     appearance: {
         hat: 0xEE2200,      // Red
         shirt: 0xEE2200,    // Red
         overalls: 0x2244CC, // Blue
+        skin: 0xFFCCAA,
+        hair: 0x441100,     // Brown
+        shoes: 0x441100,    // Brown
+        buttons: 0xFFDD00,  // Gold
+        eye: 0x000000
+    },
+
+    // Visual Palette (Fire)
+    fireAppearance: {
+        hat: 0xFFFFFF,      // White
+        shirt: 0xFFFFFF,    // White
+        overalls: 0xEE2200, // Red
         skin: 0xFFCCAA,
         hair: 0x441100,     // Brown
         shoes: 0x441100,    // Brown

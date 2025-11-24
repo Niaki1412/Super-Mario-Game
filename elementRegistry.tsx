@@ -336,6 +336,50 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     }
   },
   {
+    id: 108,
+    type: 'object',
+    name: 'Fire Mushroom',
+    category: 'collectible',
+    color: 0xFF8800,
+    attributes: { points: 1000, gravity: true, speed: 2, variant: 'fire' },
+    renderSVG: () => (
+        <>
+            <path d="M2 18 Q16 -8 30 18 H2 Z" fill="#FFA500" />
+            <circle cx="8" cy="12" r="3" fill="red" />
+            <circle cx="24" cy="12" r="3" fill="red" />
+            <circle cx="16" cy="6" r="4" fill="red" />
+            <path d="M10 18 V26 Q10 30 16 30 Q22 30 22 26 V18" fill="#FFE0B2" />
+            <circle cx="14" cy="22" r="1" fill="black" />
+            <circle cx="18" cy="22" r="1" fill="black" />
+        </>
+    ),
+    renderPixi: (g, _l, x, y, w, h) => {
+         g.moveTo(x + w*0.1, y + h*0.6)
+            .quadraticCurveTo(x + w*0.5, y - h*0.2, x + w*0.9, y + h*0.6)
+            .lineTo(x + w*0.1, y + h*0.6)
+            .fill(0xFFD700); // Gold/Orange base
+         g.circle(x + w*0.3, y + h*0.4, 3).fill(0xFF0000); // Red spots
+         g.circle(x + w*0.7, y + h*0.4, 3).fill(0xFF0000);
+         g.circle(x + w*0.5, y + h*0.2, 4).fill(0xFF0000);
+         g.rect(x + w*0.3, y + h*0.6, w*0.4, h*0.3).fill(0xFFE0B2);
+         g.circle(x + w*0.4, y + h*0.75, 1).fill(0x000000);
+         g.circle(x + w*0.6, y + h*0.75, 1).fill(0x000000);
+    }
+  },
+  {
+    id: 999, // Internal
+    type: 'object',
+    name: 'Bullet',
+    category: 'decoration', // Hidden from palette basically
+    color: 0xFF4400,
+    attributes: { gravity: false, speed: 8 },
+    renderSVG: () => <></>,
+    renderPixi: (g, _l, x, y, w, h) => {
+        g.circle(x + w/2, y + h/2, w/4).fill(0xFF4400);
+        g.circle(x + w/2, y + h/2, w/6).fill(0xFFFF00);
+    }
+  },
+  {
     id: 104,
     type: 'object',
     name: 'Player Start',

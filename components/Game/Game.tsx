@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
@@ -131,8 +132,10 @@ export const Game: React.FC = () => {
             grounded: false,
             isPlayer: true,
             isBig: false,
+            canShoot: false, // Start without shooting ability
             hasGravity: true,
-            invincibleTimer: 0
+            invincibleTimer: 0,
+            shootCooldown: 0
         });
 
         // Create Enemies & Items
@@ -207,8 +210,13 @@ export const Game: React.FC = () => {
       const phys = PLAYER_CONFIG.physics;
 
       // Filter dead entities (except player, handled separately)
-      // Also filter finished effects
-      entitiesRef.current = entities.filter(e => (!e.isDead || e.isPlayer) && !(e.isEffect && e.vy > 5)); // Remove effect coins when falling back down
+      // Also filter finished effects and bullets off screen
+      entitiesRef.current = entities.filter(e => {
+          if (e.isDead && !e.isPlayer) return false;
+          if (e.isEffect && e.vy > 5) return false; // Effect coins
+          if (e.isBullet && (e.x < 0 || e.x > map.width * TILE_SIZE)) return false; // Bullets off screen
+          return true;
+      });
       
       // Update Particles
       for (let i = particlesRef.current.length - 1; i >= 0; i--) {
@@ -229,12 +237,39 @@ export const Game: React.FC = () => {
             if (entity.vy > phys.terminalVelocity) entity.vy = phys.terminalVelocity;
           }
 
-          // Visual Effects logic
+          // Visual Effects logic (Coins, etc.)
           if (entity.isEffect) {
               entity.x += entity.vx * delta;
               entity.y += entity.vy * delta;
-              // Remove if falls below screen or some criteria (Handled by filter above primarily)
               return; // Skip collision
+          }
+
+          // Bullet Logic
+          if (entity.isBullet) {
+              entity.x += entity.vx * delta;
+              
+              // Check wall collision
+              const tx = Math.floor((entity.x + entity.w/2) / TILE_SIZE);
+              const ty = Math.floor((entity.y + entity.h/2) / TILE_SIZE);
+              const tile = getTileAt(entity.x + entity.w/2, entity.y + entity.h/2, map);
+              if (isSolid(tile)) {
+                  entity.isDead = true;
+                  spawnParticles(entity.x, entity.y, 0xFF4400);
+                  return;
+              }
+
+              // Check Enemy Collision
+              entities.forEach(other => {
+                  if (other === entity || other.isDead || !other.isEnemy) return;
+                  if (checkRectCollision(entity, other)) {
+                      entity.isDead = true;
+                      other.isDead = true;
+                      addScore(100);
+                      spawnParticles(other.x, other.y, 0xFF4400);
+                      audioManager.playStomp(); // Or kick sound
+                  }
+              });
+              return;
           }
 
           // 2. Control (Player)
@@ -258,6 +293,17 @@ export const Game: React.FC = () => {
                   entity.vy = force;
                   entity.grounded = false;
                   audioManager.playJump();
+              }
+              
+              // Shoot (X Key)
+              if (keys['x'] || keys['X']) {
+                  if (entity.canShoot && (!entity.shootCooldown || entity.shootCooldown <= 0)) {
+                      spawnBullet(entity);
+                      entity.shootCooldown = 20; // Cooldown frames
+                  }
+              }
+              if (entity.shootCooldown && entity.shootCooldown > 0) {
+                  entity.shootCooldown -= delta;
               }
 
               // Invincibility Timer
@@ -319,7 +365,7 @@ export const Game: React.FC = () => {
                else if (entity.isShell && Math.abs(entity.vx) > 2) {
                    // Shell Killing Logic
                    entities.forEach(other => {
-                       if (other === entity || other.isDead || other.isPlayer || other.isEffect) return;
+                       if (other === entity || other.isDead || other.isPlayer || other.isEffect || other.isBullet) return;
                        if (other.isEnemy && checkRectCollision(entity, other)) {
                            other.isDead = true;
                            addScore(200);
@@ -343,7 +389,7 @@ export const Game: React.FC = () => {
           // 6. Entity vs Entity Collision (Player vs World)
           if (entity.isPlayer && !entity.isDead) {
               entities.forEach(other => {
-                  if (entity === other || other.isDead || other.isEffect) return;
+                  if (entity === other || other.isDead || other.isEffect || other.isBullet) return;
 
                   if (checkRectCollision(entity, other)) {
                       const config = getElementByName(other.type);
@@ -460,6 +506,15 @@ export const Game: React.FC = () => {
                                   entity.y -= (PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height);
                               }
                               audioManager.playPowerup();
+                          } else if (config?.attributes?.variant === 'fire') {
+                              // Fire Mushroom Logic
+                              if (!entity.isBig) {
+                                  entity.isBig = true;
+                                  entity.h = PLAYER_CONFIG.big.height;
+                                  entity.y -= (PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height);
+                              }
+                              entity.canShoot = true; // Enable shooting
+                              audioManager.playPowerup();
                           } else {
                               audioManager.playCoin();
                           }
@@ -470,11 +525,31 @@ export const Game: React.FC = () => {
       });
   };
 
+  const spawnBullet = (player: Entity) => {
+      audioManager.playShoot();
+      const dir = lastDirRef.current;
+      entitiesRef.current.push({
+          id: `bullet-${Date.now()}`,
+          type: 'Bullet',
+          x: dir > 0 ? player.x + player.w : player.x - 8,
+          y: player.y + player.h * 0.5,
+          w: 8,
+          h: 8,
+          vx: dir * PLAYER_CONFIG.physics.bulletSpeed,
+          vy: 0,
+          isDead: false,
+          grounded: false,
+          hasGravity: false,
+          isBullet: true
+      });
+  };
+
   const takeDamage = (entity: Entity) => {
       if (entity.invincibleTimer && entity.invincibleTimer > 0) return;
       
       if (entity.isBig) {
           entity.isBig = false;
+          entity.canShoot = false; // Lose powerup
           entity.h = PLAYER_CONFIG.small.height;
           entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; 
           audioManager.playBump(); 
@@ -630,9 +705,11 @@ export const Game: React.FC = () => {
       const w = e.w;
       const h = e.h;
       const isBig = e.isBig;
+      const canShoot = e.canShoot;
       
       const isRight = lastDirRef.current > 0;
-      const colors = PLAYER_CONFIG.appearance;
+      // Switch palette if shooting enabled
+      const colors = canShoot ? PLAYER_CONFIG.fireAppearance : PLAYER_CONFIG.appearance;
 
       const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
 
@@ -727,6 +804,11 @@ export const Game: React.FC = () => {
               const config = getElementByName(e.type);
               if (config && config.name !== 'Invisible Death Block') {
                  config.renderPixi(g, labels, e.x, e.y, e.w, e.h, e);
+              } else if (e.isBullet) {
+                  // Fallback if bullet not in registry or just standard draw
+                   const bulletConfig = getElementByName('Bullet');
+                   if (bulletConfig) bulletConfig.renderPixi(g, null, e.x, e.y, e.w, e.h);
+                   else g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
               }
           }
       });
@@ -784,6 +866,9 @@ export const Game: React.FC = () => {
     <div ref={containerRef} className="h-screen w-screen overflow-hidden relative">
         <div className="absolute top-4 left-4 text-white font-mono text-xl font-bold drop-shadow-md z-10 select-none">
             SCORE: {score}
+        </div>
+        <div className="absolute top-10 left-4 text-white font-mono text-xs opacity-70 drop-shadow-md z-10 select-none">
+            CONTROLS: ARROWS to Move, SPACE to Jump, X to Shoot
         </div>
 
         <button 
