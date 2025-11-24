@@ -85,6 +85,11 @@ export interface Entity extends Rect {
   plantTimer?: number;
   plantOffset?: number; // Y offset from base (0 = hidden, negative = out)
 
+  // Spike specific
+  spikeState?: 'hidden' | 'warning' | 'active';
+  spikeTimer?: number;
+  rotationAngle?: number;
+
   // Physics specific
   hasGravity?: boolean;
 

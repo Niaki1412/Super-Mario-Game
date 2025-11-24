@@ -287,6 +287,81 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     }
   },
   {
+      id: 109,
+      type: 'object',
+      name: 'Pop-up Spike',
+      category: 'enemy',
+      color: 0x888888,
+      attributes: { points: 0, gravity: false, lethal: true },
+      renderSVG: () => (
+          <>
+             <rect x="0" y="24" width="32" height="8" fill="#555" />
+             <polygon points="4,24 8,8 12,24" fill="#999" />
+             <polygon points="14,24 18,8 22,24" fill="#999" />
+             <polygon points="24,24 28,8 32,24" fill="#999" />
+          </>
+      ),
+      renderPixi: (g, _l, x, y, w, h, data) => {
+          // Base
+          g.rect(x, y + h*0.8, w, h*0.2).fill(0x555555);
+          
+          let state = data?.spikeState || 'active'; // Default to active in editor
+          
+          if (state !== 'hidden') {
+              const spikeH = state === 'warning' ? h*0.2 : h*0.7;
+              const baseY = y + h*0.8;
+              const color = 0x999999;
+              
+              // Draw 3 spikes
+              for(let i=0; i<3; i++) {
+                  const sx = x + (w/3) * i;
+                  g.moveTo(sx + 2, baseY)
+                   .lineTo(sx + (w/3)/2, baseY - spikeH)
+                   .lineTo(sx + (w/3) - 2, baseY)
+                   .fill(color);
+              }
+          }
+      }
+  },
+  {
+      id: 110,
+      type: 'object',
+      name: 'Rotating Spike',
+      category: 'enemy',
+      color: 0x333333,
+      attributes: { points: 0, gravity: false, lethal: true },
+      renderSVG: () => (
+          <>
+             <rect x="12" y="12" width="8" height="8" fill="#555" />
+             <line x1="16" y1="16" x2="28" y2="4" stroke="#777" strokeWidth="2" />
+             <circle cx="28" cy="4" r="4" fill="#333" />
+          </>
+      ),
+      renderPixi: (g, _l, x, y, w, h, data) => {
+          // Pivot
+          const cx = x + w/2;
+          const cy = y + h/2;
+          g.rect(x + w*0.3, y + h*0.3, w*0.4, h*0.4).fill(0x555555).stroke({width: 1, color: 0x000000});
+          
+          const angle = data?.rotationAngle ?? 0;
+          const radius = w * 2.5; // Orbit radius
+          
+          const ballX = cx + Math.cos(angle) * radius;
+          const ballY = cy + Math.sin(angle) * radius;
+          
+          // Chain
+          g.moveTo(cx, cy).lineTo(ballX, ballY).stroke({width: 2, color: 0x777777});
+          
+          // Spike Ball
+          g.circle(ballX, ballY, w*0.4).fill(0x333333);
+          // Spikes on ball (simple lines)
+          for(let i=0; i<8; i++) {
+              const a = i * (Math.PI/4);
+              g.moveTo(ballX, ballY).lineTo(ballX + Math.cos(a)*w*0.5, ballY + Math.sin(a)*w*0.5).stroke({width: 2, color: 0x999999});
+          }
+      }
+  },
+  {
     id: 102,
     type: 'object',
     name: 'Coin',

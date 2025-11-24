@@ -196,7 +196,11 @@ export const Game: React.FC = () => {
                 
                 plantState: 'hidden',
                 plantTimer: 0,
-                plantOffset: 0
+                plantOffset: 0,
+
+                spikeState: 'hidden',
+                spikeTimer: 0,
+                rotationAngle: 0
             });
         });
 
@@ -280,6 +284,9 @@ export const Game: React.FC = () => {
               // Enemy Collision
               entities.forEach(other => {
                   if (other === entity || other.isDead || !other.isEnemy) return;
+                  // Bullets can't kill traps usually, skip spikes
+                  if (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike') return;
+
                   if (checkRectCollision(entity, other)) {
                       entity.isDead = true;
                       other.isDead = true;
@@ -377,10 +384,40 @@ export const Game: React.FC = () => {
                        }
                    }
                }
+               else if (entity.type === 'Pop-up Spike') {
+                   entity.vx = 0;
+                   entity.vy = 0;
+                   entity.spikeTimer = (entity.spikeTimer || 0) + delta;
+                   
+                   // Cycle: Hidden (120) -> Warning (30) -> Active (60)
+                   if (entity.spikeState === 'hidden') {
+                       if (entity.spikeTimer > 120) {
+                           entity.spikeState = 'warning';
+                           entity.spikeTimer = 0;
+                       }
+                   } else if (entity.spikeState === 'warning') {
+                       if (entity.spikeTimer > 30) {
+                           entity.spikeState = 'active';
+                           entity.spikeTimer = 0;
+                       }
+                   } else if (entity.spikeState === 'active') {
+                        if (entity.spikeTimer > 60) {
+                            entity.spikeState = 'hidden';
+                            entity.spikeTimer = 0;
+                        }
+                   }
+               }
+               else if (entity.type === 'Rotating Spike') {
+                   entity.vx = 0;
+                   entity.vy = 0;
+                   entity.rotationAngle = (entity.rotationAngle || 0) + 0.05 * delta;
+               }
                
                else if (entity.isShell && Math.abs(entity.vx) > 2) {
                    entities.forEach(other => {
                        if (other === entity || other.isDead || other.isPlayer || other.isEffect || other.isBullet) return;
+                       if (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike') return; // Shells bounce off traps? or just ignore
+
                        if (other.isEnemy && checkRectCollision(entity, other)) {
                            other.isDead = true;
                            addScore(200);
@@ -460,6 +497,23 @@ export const Game: React.FC = () => {
                               return;
                           }
 
+                          if (other.type === 'Pop-up Spike') {
+                              if (other.spikeState === 'active') {
+                                   takeDamage(entity);
+                              }
+                              return;
+                          }
+
+                          // Rotating Spike collision is special (circle/ball collision)
+                          if (other.type === 'Rotating Spike') {
+                              // Collision logic will be handled outside this block because the ball rect is different
+                              // from the entity rect. But since we are iterating, we can check here.
+                              // BUT: checkRectCollision passed true already for the Pivot.
+                              // The Pivot is safe (unless we want it lethal).
+                              // We need to check the ball explicitly.
+                              return; // Skip default enemy check, handled below explicitly
+                          }
+
                           const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
 
                           if (isStomp) {
@@ -513,6 +567,29 @@ export const Game: React.FC = () => {
                           } else {
                               audioManager.playCoin();
                           }
+                      }
+                  }
+
+                  // Handle Rotating Spike Ball Collision separately (can be far from pivot)
+                  if (other.type === 'Rotating Spike') {
+                      const angle = other.rotationAngle || 0;
+                      const radius = other.w * 2.5;
+                      const cx = other.x + other.w/2;
+                      const cy = other.y + other.h/2;
+                      
+                      const ballRadius = other.w * 0.4;
+                      const ballX = cx + Math.cos(angle) * radius;
+                      const ballY = cy + Math.sin(angle) * radius;
+
+                      const ballRect = {
+                          x: ballX - ballRadius,
+                          y: ballY - ballRadius,
+                          w: ballRadius * 2,
+                          h: ballRadius * 2
+                      };
+
+                      if (checkRectCollision(entity, ballRect)) {
+                           takeDamage(entity);
                       }
                   }
               });
