@@ -118,6 +118,15 @@ export const Editor: React.FC = () => {
     } else {
       let textContent: string | undefined = undefined;
 
+      // Check for duplicates (prevents object stacking during drag)
+      const pixelX = x * TILE_SIZE;
+      const pixelY = y * TILE_SIZE;
+      
+      const existingObj = mapData.objects.find(o => 
+          o.x === pixelX && o.y === pixelY && o.type === element.name
+      );
+      if (existingObj) return;
+
       // Handle Text Element
       if (element.name === 'Text Decoration') {
           const input = prompt("Enter a single character:", "A");
@@ -129,8 +138,8 @@ export const Editor: React.FC = () => {
       const newObj: GameObjectData = {
         id: crypto.randomUUID(),
         type: element.name, // Storing name as type reference for JSON
-        x: x * TILE_SIZE, // Snap to grid for now, can be freeform later
-        y: y * TILE_SIZE,
+        x: pixelX, 
+        y: pixelY,
         text: textContent
       };
       setMapData(prev => ({ ...prev, objects: [...prev.objects, newObj] }));

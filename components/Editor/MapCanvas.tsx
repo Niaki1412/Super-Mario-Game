@@ -26,6 +26,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const labelsContainerRef = useRef<PIXI.Container | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
 
+  // Drag State
+  const isPaintingRef = useRef(false);
+  const lastGridPosRef = useRef<{x: number, y: number} | null>(null);
+
   // Keep a ref to the latest callback to avoid stale closures in Pixi event listeners
   const onTileClickRef = useRef(onTileClick);
   useEffect(() => {
@@ -97,15 +101,45 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             return { x, y };
         };
 
-        app.stage.on('pointerdown', (e) => {
+        const onPointerDown = (e: PIXI.FederatedPointerEvent) => {
             const { x, y } = getGridPos(e);
             
             // Ignore clicks on the ruler itself
             if (x < 0 || y < 0) return;
             
+            isPaintingRef.current = true;
+            lastGridPosRef.current = { x, y };
+
             const isRightClick = e.button === 2;
             onTileClickRef.current(x, y, isRightClick);
-        });
+        };
+
+        const onPointerMove = (e: PIXI.FederatedPointerEvent) => {
+            if (!isPaintingRef.current) return;
+
+            const { x, y } = getGridPos(e);
+            if (x < 0 || y < 0) return;
+
+            // Avoid triggering multiple times for the same tile
+            const last = lastGridPosRef.current;
+            if (last && last.x === x && last.y === y) return;
+
+            lastGridPosRef.current = { x, y };
+
+            // Determine if right click is held (bitmask 2)
+            const isRightClick = (e.buttons & 2) === 2; 
+            onTileClickRef.current(x, y, isRightClick);
+        };
+
+        const onPointerUp = () => {
+            isPaintingRef.current = false;
+            lastGridPosRef.current = null;
+        };
+
+        app.stage.on('pointerdown', onPointerDown);
+        app.stage.on('pointermove', onPointerMove);
+        app.stage.on('pointerup', onPointerUp);
+        app.stage.on('pointerupoutside', onPointerUp);
 
         setIsAppReady(true);
     };
