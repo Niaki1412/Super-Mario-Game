@@ -128,7 +128,8 @@ export const Game: React.FC = () => {
             isDead: false,
             grounded: false,
             isPlayer: true,
-            isBig: false
+            isBig: false,
+            hasGravity: true
         });
 
         // Create Enemies & Items
@@ -150,7 +151,8 @@ export const Game: React.FC = () => {
                 grounded: false,
                 isEnemy: config.category === 'enemy',
                 isCollectible: config.category === 'collectible',
-                patrolCenter: obj.x
+                patrolCenter: obj.x,
+                hasGravity: config.attributes?.gravity ?? true // Default to true if not specified
             });
         });
 
@@ -202,8 +204,10 @@ export const Game: React.FC = () => {
           if (entity.isDead && !entity.isPlayer) return;
 
           // 1. Apply Gravity
-          entity.vy += phys.gravity * delta;
-          if (entity.vy > phys.terminalVelocity) entity.vy = phys.terminalVelocity;
+          if (entity.hasGravity) {
+            entity.vy += phys.gravity * delta;
+            if (entity.vy > phys.terminalVelocity) entity.vy = phys.terminalVelocity;
+          }
 
           // 2. Control (Player)
           if (entity.isPlayer && !entity.isDead) {

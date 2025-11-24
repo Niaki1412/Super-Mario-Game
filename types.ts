@@ -1,3 +1,4 @@
+
 // Map Data Structure
 export interface GameMap {
   width: number; // Width in tiles
@@ -71,6 +72,9 @@ export interface Entity extends Rect {
   
   // Enemy specific
   patrolCenter?: number;
+
+  // Physics specific
+  hasGravity?: boolean;
 }
 
 export interface Particle {
