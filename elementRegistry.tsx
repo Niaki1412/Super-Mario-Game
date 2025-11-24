@@ -147,6 +147,28 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
         }
     }
   },
+  {
+    id: 6,
+    type: 'tile',
+    name: 'Empty Block',
+    category: 'terrain',
+    color: 0x8B4513, 
+    attributes: { solid: true, destructible: false },
+    renderSVG: () => (
+        <>
+             <rect x="0" y="0" width="32" height="32" fill="#654321" />
+             <rect x="4" y="4" width="24" height="24" fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="2" />
+        </>
+    ),
+    renderPixi: (g, _l, x, y, w, h) => {
+        g.rect(x, y, w, h).fill(0x654321);
+        g.rect(x + 4, y + 4, w - 8, h - 8).stroke({ width: 2, color: 0x000000, alpha: 0.3 });
+        g.circle(x + 6, y + 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+        g.circle(x + w - 6, y + 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+        g.circle(x + 6, y + h - 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+        g.circle(x + w - 6, y + h - 6, 1.5).fill({color: 0x000000, alpha: 0.3});
+    }
+  },
 
   // --- OBJECTS ---
   {

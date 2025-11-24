@@ -207,7 +207,8 @@ export const Game: React.FC = () => {
       const phys = PLAYER_CONFIG.physics;
 
       // Filter dead entities (except player, handled separately)
-      entitiesRef.current = entities.filter(e => !e.isDead || e.isPlayer);
+      // Also filter finished effects
+      entitiesRef.current = entities.filter(e => (!e.isDead || e.isPlayer) && !(e.isEffect && e.vy > 5)); // Remove effect coins when falling back down
       
       // Update Particles
       for (let i = particlesRef.current.length - 1; i >= 0; i--) {
@@ -226,6 +227,14 @@ export const Game: React.FC = () => {
           if (entity.hasGravity) {
             entity.vy += phys.gravity * delta;
             if (entity.vy > phys.terminalVelocity) entity.vy = phys.terminalVelocity;
+          }
+
+          // Visual Effects logic
+          if (entity.isEffect) {
+              entity.x += entity.vx * delta;
+              entity.y += entity.vy * delta;
+              // Remove if falls below screen or some criteria (Handled by filter above primarily)
+              return; // Skip collision
           }
 
           // 2. Control (Player)
@@ -310,7 +319,7 @@ export const Game: React.FC = () => {
                else if (entity.isShell && Math.abs(entity.vx) > 2) {
                    // Shell Killing Logic
                    entities.forEach(other => {
-                       if (other === entity || other.isDead || other.isPlayer) return;
+                       if (other === entity || other.isDead || other.isPlayer || other.isEffect) return;
                        if (other.isEnemy && checkRectCollision(entity, other)) {
                            other.isDead = true;
                            addScore(200);
@@ -334,7 +343,7 @@ export const Game: React.FC = () => {
           // 6. Entity vs Entity Collision (Player vs World)
           if (entity.isPlayer && !entity.isDead) {
               entities.forEach(other => {
-                  if (entity === other || other.isDead) return;
+                  if (entity === other || other.isDead || other.isEffect) return;
 
                   if (checkRectCollision(entity, other)) {
                       const config = getElementByName(other.type);
@@ -523,14 +532,40 @@ export const Game: React.FC = () => {
                           entity.y = tileRect.y + tileRect.h;
                           entity.vy = 0;
                           
-                          // Handle Destructible Bricks
+                          // Check what we hit
                           const el = getElementById(tileId);
+
+                          // 1. Destructible Bricks
                           if (el?.attributes?.destructible && entity.isPlayer) {
                               map.tiles[y][x] = 0; // Destroy
                               addScore(10);
                               spawnParticles(tileRect.x, tileRect.y, el.color);
                               audioManager.playBump(); 
-                          } else {
+                          } 
+                          // 2. Question Blocks
+                          else if (el?.name === 'Question Block' && entity.isPlayer) {
+                              // Swap to Empty Block
+                              map.tiles[y][x] = 6; // ID for Empty Block
+                              addScore(200);
+                              audioManager.playCoin();
+                              
+                              // Spawn floating coin effect
+                              entitiesRef.current.push({
+                                  id: `coin-fx-${Date.now()}`,
+                                  type: 'Coin',
+                                  x: tileRect.x,
+                                  y: tileRect.y - TILE_SIZE, // Start above
+                                  w: TILE_SIZE,
+                                  h: TILE_SIZE,
+                                  vx: 0,
+                                  vy: -8, // Pop up
+                                  isDead: false,
+                                  grounded: false,
+                                  hasGravity: true,
+                                  isEffect: true // Use effect flag
+                              });
+                          }
+                          else {
                               if (entity.isPlayer) audioManager.playBump();
                           }
                       }

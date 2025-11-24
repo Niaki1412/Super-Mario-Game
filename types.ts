@@ -67,6 +67,7 @@ export interface Entity extends Rect {
   isPlayer?: boolean;
   isEnemy?: boolean;
   isCollectible?: boolean;
+  isEffect?: boolean;
   
   // Player specific
   isBig?: boolean;
