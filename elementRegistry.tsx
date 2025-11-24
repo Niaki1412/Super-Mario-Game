@@ -301,7 +301,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Text Decoration',
     category: 'decoration',
     color: 0xFFFFFF,
-    attributes: { solid: false },
+    attributes: { solid: false, gravity: false },
     renderSVG: () => (
          <text x="16" y="24" fontSize="24" textAnchor="middle" fill="currentColor" fontWeight="bold">T</text>
     ),
