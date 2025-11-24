@@ -147,11 +147,6 @@ export const Game: React.FC = () => {
             
             if (config.name === 'Flagpole') {
                  h = TILE_SIZE * 9;
-                 // Shift y up so the base is at obj.y + TILE_SIZE - h?
-                 // No, in registry renderPixi draws up from the base.
-                 // We want the hitbox to cover the pole.
-                 // The 'obj.y' is where the user clicked, representing the base block.
-                 // So the hitbox top is y - (h - TILE_SIZE)
                  y = obj.y - (h - TILE_SIZE);
             }
 
@@ -171,7 +166,12 @@ export const Game: React.FC = () => {
                 patrolCenter: obj.x,
                 hasGravity: config.attributes?.gravity ?? true, // Default to true if not specified
                 text: obj.text,
-                isShell: false // Init for Turtles
+                isShell: false, // Init for Turtles
+                
+                // Piranha Plant Init
+                plantState: 'hidden',
+                plantTimer: 0,
+                plantOffset: 0
             });
         });
 
@@ -269,15 +269,49 @@ export const Game: React.FC = () => {
 
           // 3. AI Movement & Shell Mechanics
           if (entity.isEnemy) {
-               // If it's a moving shell, it shouldn't be slowed by friction logic (if we had any for enemies)
-               // But standard enemies also have constant velocity here usually.
+               // Piranha Plant Logic
+               if (entity.type === 'Piranha Plant') {
+                   entity.vx = 0; // Stationary base
+                   entity.vy = 0; // Anchored
+                   
+                   // State Machine
+                   entity.plantTimer = (entity.plantTimer || 0) + delta;
+                   const MAX_HEIGHT = -TILE_SIZE * 0.8;
+                   const MOVE_SPEED = 0.5;
+
+                   if (entity.plantState === 'hidden') {
+                       if (entity.plantTimer > 180) { // 3 seconds
+                           entity.plantState = 'extending';
+                           entity.plantTimer = 0;
+                       }
+                   } else if (entity.plantState === 'extending') {
+                       entity.plantOffset = (entity.plantOffset || 0) - MOVE_SPEED * delta;
+                       if (entity.plantOffset <= MAX_HEIGHT) {
+                           entity.plantOffset = MAX_HEIGHT;
+                           entity.plantState = 'out';
+                           entity.plantTimer = 0;
+                       }
+                   } else if (entity.plantState === 'out') {
+                       if (entity.plantTimer > 180) {
+                           entity.plantState = 'retracting';
+                           entity.plantTimer = 0;
+                       }
+                   } else if (entity.plantState === 'retracting') {
+                       entity.plantOffset = (entity.plantOffset || 0) + MOVE_SPEED * delta;
+                       if (entity.plantOffset >= 0) {
+                           entity.plantOffset = 0;
+                           entity.plantState = 'hidden';
+                           entity.plantTimer = 0;
+                       }
+                   }
+               }
                
-               // Check collisions with OTHER enemies (Shell Killing)
-               if (entity.isShell && Math.abs(entity.vx) > 2) {
+               // Turtle / Generic AI
+               else if (entity.isShell && Math.abs(entity.vx) > 2) {
+                   // Shell Killing Logic
                    entities.forEach(other => {
                        if (other === entity || other.isDead || other.isPlayer) return;
                        if (other.isEnemy && checkRectCollision(entity, other)) {
-                           // Kill the other enemy
                            other.isDead = true;
                            addScore(200);
                            spawnParticles(other.x, other.y, 0xFFFFFF);
@@ -305,42 +339,88 @@ export const Game: React.FC = () => {
                   if (checkRectCollision(entity, other)) {
                       const config = getElementByName(other.type);
 
+                      // Win
                       if (config?.attributes?.win) {
                           winLevel();
                           return;
                       }
+                      
+                      // Solid Objects (e.g. Pipe Base)
+                      if (config?.attributes?.solid) {
+                         // Simple resolution: separate axis similar to tiles
+                         // Determine overlap
+                         const dx = (entity.x + entity.w/2) - (other.x + other.w/2);
+                         const dy = (entity.y + entity.h/2) - (other.y + other.h/2);
+                         const width = (entity.w + other.w) / 2;
+                         const height = (entity.h + other.h) / 2;
+                         const crossWidth = width * dy;
+                         const crossHeight = height * dx;
 
+                         if (Math.abs(dx) <= width && Math.abs(dy) <= height) {
+                             if (crossWidth > crossHeight) {
+                                 if (crossWidth > -crossHeight) {
+                                     // Bottom collision (Head hits bottom of block)
+                                     entity.y = other.y + other.h;
+                                     entity.vy = 0;
+                                 } else {
+                                     // Left collision
+                                     entity.x = other.x - entity.w;
+                                     entity.vx = 0;
+                                 }
+                             } else {
+                                 if (crossWidth > -crossHeight) {
+                                     // Right collision
+                                     entity.x = other.x + other.w;
+                                     entity.vx = 0;
+                                 } else {
+                                     // Top collision (Standing on block)
+                                     entity.y = other.y - entity.h;
+                                     entity.vy = 0;
+                                     entity.grounded = true;
+                                 }
+                             }
+                         }
+                      }
+
+                      // Interactable Enemies
                       if (other.isEnemy) {
-                          // --- Enemy Collision Logic ---
+                          // Piranha Plant HEAD Check
+                          if (other.type === 'Piranha Plant') {
+                              const offset = other.plantOffset || 0;
+                              // Only lethal if plant is somewhat out
+                              if (offset < -5) { 
+                                  // Head Rect (approx)
+                                  const headRect = {
+                                      x: other.x + other.w * 0.2,
+                                      y: other.y + offset + other.h * 0.2,
+                                      w: other.w * 0.6,
+                                      h: other.h * 0.6
+                                  };
+                                  if (checkRectCollision(entity, headRect)) {
+                                       takeDamage(entity);
+                                  }
+                              }
+                              // Note: The base pipe collision is handled by 'solid' check above if config.solid is true
+                              return;
+                          }
 
-                          // Check Stomp (Player is falling and above enemy)
+                          // Standard Stomp Check
                           const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
 
                           if (isStomp) {
                               if (other.type === 'Turtle') {
-                                  // Turtle Specifics
-                                  entity.vy = phys.bounceForce; // Bounce
+                                  entity.vy = phys.bounceForce;
                                   audioManager.playStomp();
 
                                   if (!other.isShell) {
-                                      // Walk -> Shell (Stop)
                                       other.isShell = true;
                                       other.vx = 0;
                                       addScore(100);
                                   } else {
-                                      // Shell -> Stop (if moving) or Kick (if stopped)?
-                                      // Classic: Stomping a moving shell stops it. Stomping a stopped shell kicks it?
-                                      // Actually usually stomping a shell stops it.
-                                      if (Math.abs(other.vx) > 0.1) {
-                                          other.vx = 0; // Stop
-                                      } else {
-                                          // Kick if stomped while stopped? Let's say yes for fun, or just keep stopped.
-                                          // Let's just keep it stopped if stomped.
-                                          other.vx = 0;
-                                      }
+                                      other.vx = 0; // Stop
                                   }
                               } else {
-                                  // Standard Enemy (Goomba) -> Die
+                                  // Goomba
                                   other.isDead = true;
                                   entity.vy = phys.bounceForce; 
                                   addScore(100);
@@ -348,33 +428,15 @@ export const Game: React.FC = () => {
                                   audioManager.playStomp();
                               }
                           } else {
-                              // --- Side Collision (Not Stomp) ---
-                              
+                              // Side Collision
                               if (other.type === 'Turtle' && other.isShell && Math.abs(other.vx) < 0.1) {
-                                  // Kick the shell!
+                                  // Kick
                                   const dir = entity.x < other.x ? 1 : -1;
-                                  other.vx = dir * 8; // High speed
-                                  // Move shell slightly out of player to prevent immediate re-collision/damage
+                                  other.vx = dir * 8;
                                   other.x += dir * 4; 
-                                  audioManager.playBump(); // Kick sound
+                                  audioManager.playBump();
                               } else {
-                                  // Damage Logic
-                                  // If Invincible, ignore
-                                  if (entity.invincibleTimer && entity.invincibleTimer > 0) {
-                                      return;
-                                  }
-                                  
-                                  // If Big, Shrink
-                                  if (entity.isBig) {
-                                      entity.isBig = false;
-                                      entity.h = PLAYER_CONFIG.small.height;
-                                      entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; 
-                                      audioManager.playBump(); 
-                                      entity.invincibleTimer = 1.0; 
-                                  } else {
-                                      // Die
-                                      die();
-                                  }
+                                  takeDamage(entity);
                               }
                           }
                       } else if (other.isCollectible) {
@@ -382,7 +444,6 @@ export const Game: React.FC = () => {
                           other.isDead = true;
                           if (config?.attributes?.points) addScore(config.attributes.points);
                           
-                          // Effects
                           if (config?.attributes?.variant === 'grow') {
                               if (!entity.isBig) {
                                   entity.isBig = true;
@@ -398,6 +459,20 @@ export const Game: React.FC = () => {
               });
           }
       });
+  };
+
+  const takeDamage = (entity: Entity) => {
+      if (entity.invincibleTimer && entity.invincibleTimer > 0) return;
+      
+      if (entity.isBig) {
+          entity.isBig = false;
+          entity.h = PLAYER_CONFIG.small.height;
+          entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; 
+          audioManager.playBump(); 
+          entity.invincibleTimer = 1.0; 
+      } else {
+          die();
+      }
   };
 
   const handleTileCollision = (entity: Entity, map: GameMap, axis: 'x' | 'y') => {
@@ -423,7 +498,6 @@ export const Game: React.FC = () => {
                       if (entity.vx > 0) {
                           // Moving Right
                           entity.x = tileRect.x - entity.w;
-                          // Bounce logic for shells, Turn logic for normal enemies
                           if (entity.isEnemy) {
                               entity.vx = -entity.vx;
                           } else {
@@ -452,18 +526,16 @@ export const Game: React.FC = () => {
                           // Handle Destructible Bricks
                           const el = getElementById(tileId);
                           if (el?.attributes?.destructible && entity.isPlayer) {
-                              // Only break if Big? (Classic Mario rule, but let's allow all for now or check config)
                               map.tiles[y][x] = 0; // Destroy
                               addScore(10);
                               spawnParticles(tileRect.x, tileRect.y, el.color);
-                              audioManager.playBump(); // Break sound
+                              audioManager.playBump(); 
                           } else {
-                              // Hitting a solid block head-on
                               if (entity.isPlayer) audioManager.playBump();
                           }
                       }
                   }
-                  return; // Resolved one collision is enough per axis step usually
+                  return; 
               }
           }
       }
@@ -515,7 +587,6 @@ export const Game: React.FC = () => {
   const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
       // Invincibility Flicker
       if (e.invincibleTimer && e.invincibleTimer > 0) {
-          // Flicker every ~0.1s (assuming 60fps, every 6 frames)
           if (Math.floor(Date.now() / 80) % 2 === 0) return;
       }
 
@@ -528,28 +599,22 @@ export const Game: React.FC = () => {
       const isRight = lastDirRef.current > 0;
       const colors = PLAYER_CONFIG.appearance;
 
-      // Helper to calculate X position based on direction
       const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
 
       const isRunning = Math.abs(e.vx) > 0.1 && e.grounded;
       const tick = Date.now() / 150;
       const animOffset = isRunning ? Math.sin(tick) * (w * 0.15) : 0;
       
-      // Proportions vary slightly if big
       const legH = isBig ? h * 0.2 : h * 0.25;
       const bodyH = isBig ? h * 0.4 : h * 0.4;
       const headH = isBig ? h * 0.25 : h * 0.35;
       
-      // -- LEGS --
       const legW = w * 0.25;
-      
       const blX = w * 0.2 + animOffset;
       g.rect(tx(blX, legW), y + h - legH, legW, legH).fill(colors.overalls);
-      
       const flX = w * 0.55 - animOffset;
       g.rect(tx(flX, legW), y + h - legH, legW, legH).fill(colors.overalls);
 
-      // -- BODY --
       const bodyY = y + h - legH - bodyH;
       g.rect(tx(w*0.2, w*0.6), bodyY, w*0.6, bodyH).fill(colors.overalls);
       g.rect(tx(w*0.15, w*0.7), bodyY, w*0.7, bodyH * 0.6).fill(colors.shirt);
@@ -560,7 +625,6 @@ export const Game: React.FC = () => {
       g.circle(tx(w*0.275, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
       g.circle(tx(w*0.725, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
 
-      // -- ARMS --
       const armY = bodyY + bodyH * 0.1;
       const baX = w * 0.1 + animOffset;
       g.rect(tx(baX, w*0.2), armY, w*0.2, bodyH * 0.5).fill(colors.shirt);
@@ -569,20 +633,16 @@ export const Game: React.FC = () => {
       g.circle(tx(baX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
       g.circle(tx(faX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
 
-      // -- HEAD --
       const headSize = w * 0.75;
       const headX = w * 0.125;
       const headY = bodyY - headH;
       
       g.rect(tx(headX, headSize), headY, headSize, headH).fill(colors.skin);
-
       const hatH = headH * 0.4;
       g.rect(tx(headX - w*0.05, headSize + w*0.1), headY - hatH*0.5, headSize + w*0.1, hatH + 2).fill(colors.hat);
       g.rect(tx(w*0.45, w*0.5), headY, w*0.5, hatH * 0.5).fill(colors.hat);
-
       g.rect(tx(w*0.15, w*0.15), headY + headH*0.5, w*0.15, headH*0.3).fill(colors.hair);
       g.rect(tx(w*0.1, w*0.1), headY + headH*0.6, w*0.1, headH*0.2).fill(colors.hair);
-
       g.rect(tx(w*0.55, w*0.3), headY + headH * 0.7, w*0.3, headH*0.2).fill(colors.hair);
       g.circle(tx(w*0.85, 0), headY + headH * 0.6, w*0.12).fill(colors.skin);
       g.rect(tx(w*0.6, w*0.08), headY + headH * 0.4, w*0.08, headH*0.25).fill(colors.eye);
@@ -597,19 +657,16 @@ export const Game: React.FC = () => {
       g.clear();
       labels.removeChildren();
 
-      // Camera Follow
       const player = entitiesRef.current.find(e => e.isPlayer);
       let cameraX = 0;
       if (player) {
           cameraX = Math.max(0, player.x - window.innerWidth / 2);
-          // Clamp to map end
           const maxCam = (mapRef.current!.width * TILE_SIZE) - window.innerWidth;
           if (cameraX > maxCam) cameraX = Math.max(0, maxCam);
       }
       
       app.stage.position.x = -cameraX;
 
-      // Draw Map Tiles
       const startCol = Math.floor(cameraX / TILE_SIZE);
       const endCol = startCol + Math.ceil(window.innerWidth / TILE_SIZE) + 1;
 
@@ -626,34 +683,27 @@ export const Game: React.FC = () => {
           }
       });
 
-      // Draw Entities
       entitiesRef.current.forEach(e => {
           if (e.isDead && !e.isPlayer) return;
           
           if (e.isPlayer) {
               drawPlayer(g, e);
           } else {
-              // Ensure we don't render invisible items in-game unless we want debug
               const config = getElementByName(e.type);
-              
               if (config && config.name !== 'Invisible Death Block') {
-                 // Pass the entity data as the 7th argument
                  config.renderPixi(g, labels, e.x, e.y, e.w, e.h, e);
               }
           }
       });
 
-      // Draw Particles
       particlesRef.current.forEach(p => {
           g.rect(p.x, p.y, 4, 4).fill(p.color);
       });
   };
 
-  // --- INPUT HANDLERS ---
   useEffect(() => {
       const down = (e: KeyboardEvent) => {
           keysRef.current[e.key] = true;
-          // Try to resume audio context on first interaction
           audioManager.resume();
       };
       const up = (e: KeyboardEvent) => keysRef.current[e.key] = false;
@@ -678,8 +728,6 @@ export const Game: React.FC = () => {
     reader.readAsText(file);
   };
 
-  // --- RENDER UI ---
-
   if (!currentMap) {
       return (
           <div className="h-screen bg-gray-900 flex flex-col items-center justify-center text-white p-8">
@@ -699,7 +747,6 @@ export const Game: React.FC = () => {
 
   return (
     <div ref={containerRef} className="h-screen w-screen overflow-hidden relative">
-        {/* UI Overlay */}
         <div className="absolute top-4 left-4 text-white font-mono text-xl font-bold drop-shadow-md z-10 select-none">
             SCORE: {score}
         </div>
@@ -717,7 +764,7 @@ export const Game: React.FC = () => {
                 <p className="text-white text-xl mb-8">Score: {score}</p>
                 <div className="flex gap-4">
                     <button 
-                        onClick={() => setCurrentMap({...currentMap})} // Force Reload
+                        onClick={() => setCurrentMap({...currentMap})}
                         className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded shadow-lg"
                     >
                         Try Again

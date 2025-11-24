@@ -21,7 +21,7 @@ export interface ElementConfig {
   attributes?: {
     destructible?: boolean;
     lethal?: boolean;
-    solid?: boolean;
+    solid?: boolean; // Tiles are solid by default if this is true. Objects need special handling.
     points?: number;
     variant?: string;
     gravity?: boolean;
@@ -75,6 +75,11 @@ export interface Entity extends Rect {
   // Enemy specific
   patrolCenter?: number;
   isShell?: boolean; // For Turtle enemies
+  
+  // Piranha Plant specific
+  plantState?: 'hidden' | 'extending' | 'out' | 'retracting';
+  plantTimer?: number;
+  plantOffset?: number; // Y offset from base (0 = hidden, negative = out)
 
   // Physics specific
   hasGravity?: boolean;

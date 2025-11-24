@@ -223,6 +223,48 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     }
   },
   {
+    id: 107,
+    type: 'object',
+    name: 'Piranha Plant',
+    category: 'enemy',
+    color: 0x008000,
+    attributes: { points: 150, gravity: false, solid: true }, // solid=true for the pipe base
+    renderSVG: () => (
+        <>
+            <rect x="6" y="16" width="20" height="16" fill="#006400" />
+            <rect x="4" y="16" width="24" height="6" fill="#008000" stroke="black" strokeWidth="0.5" />
+            <path d="M16 16 V6" stroke="#00FF00" strokeWidth="2" />
+            <circle cx="16" cy="6" r="5" fill="red" />
+            <path d="M16 6 L20 2 M16 6 L12 2" stroke="white" strokeWidth="1" />
+        </>
+    ),
+    renderPixi: (g, _l, x, y, w, h, data) => {
+        // 1. Draw Plant Head (Behind Pipe if possible, but painter's algorithm says draw first)
+        // In Editor: Draw extended. In Game: Use plantOffset from data.
+        const offset = data?.plantOffset ?? -h * 0.8; 
+        
+        // Stem
+        g.rect(x + w*0.45, y + offset + h*0.5, w*0.1, h - (offset + h*0.5)).fill(0x32CD32);
+        
+        // Head (Red bulb)
+        g.circle(x + w*0.5, y + offset + h*0.3, w*0.25).fill(0xFF0000);
+        // Mouth/Teeth
+        g.moveTo(x + w*0.5, y + offset + h*0.3).lineTo(x + w*0.7, y + offset).stroke({width: 2, color: 0xFFFFFF});
+        g.moveTo(x + w*0.5, y + offset + h*0.3).lineTo(x + w*0.3, y + offset).stroke({width: 2, color: 0xFFFFFF});
+        // Spots
+        g.circle(x + w*0.4, y + offset + h*0.4, 2).fill(0xFFFFFF);
+        g.circle(x + w*0.6, y + offset + h*0.2, 2).fill(0xFFFFFF);
+
+        // 2. Draw Pipe (Foreground)
+        // Pipe Rim
+        g.rect(x, y, w, h*0.3).fill(0x008000).stroke({ width: 1, color: 0x004d00 });
+        // Pipe Body
+        g.rect(x + w*0.05, y + h*0.3, w*0.9, h*0.7).fill(0x006400).stroke({ width: 1, color: 0x003300 });
+        // Highlights
+        g.rect(x + w*0.15, y + h*0.35, w*0.1, h*0.6).fill({ color: 0x00FF00, alpha: 0.1 });
+    }
+  },
+  {
     id: 102,
     type: 'object',
     name: 'Coin',
