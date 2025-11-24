@@ -74,6 +74,7 @@ export interface Entity extends Rect {
   
   // Enemy specific
   patrolCenter?: number;
+  isShell?: boolean; // For Turtle enemies
 
   // Physics specific
   hasGravity?: boolean;

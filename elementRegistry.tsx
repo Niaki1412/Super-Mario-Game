@@ -183,6 +183,44 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     }
   },
   {
+    id: 106,
+    type: 'object',
+    name: 'Turtle',
+    category: 'enemy',
+    color: 0x228B22,
+    attributes: { points: 200, gravity: true, speed: 1 },
+    renderSVG: () => (
+        <>
+            <ellipse cx="16" cy="20" rx="10" ry="8" fill="currentColor" />
+            <circle cx="10" cy="12" r="5" fill="currentColor" />
+            <path d="M12 26 L8 30 M20 26 L24 30" stroke="currentColor" strokeWidth="3" />
+        </>
+    ),
+    renderPixi: (g, _l, x, y, w, h, data) => {
+        const isShell = data?.isShell;
+        
+        if (isShell) {
+             // Shell State
+             g.ellipse(x + w/2, y + h*0.8, w*0.4, h*0.25).fill(0x006400); // Shell
+             g.ellipse(x + w/2, y + h*0.8, w*0.3, h*0.15).stroke({ width: 2, color: 0xFFFFFF, alpha: 0.3 });
+        } else {
+            // Walking State
+            // Head
+            g.circle(x + w*0.2, y + h*0.3, w*0.15).fill(0x32CD32);
+            // Eye
+            g.circle(x + w*0.15, y + h*0.3, 2).fill(0x000000);
+            
+            // Shell Body
+            g.ellipse(x + w*0.5, y + h*0.6, w*0.35, h*0.25).fill(0x006400);
+            g.ellipse(x + w*0.5, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
+            
+            // Legs
+            g.rect(x + w*0.3, y + h*0.8, w*0.1, h*0.2).fill(0x32CD32);
+            g.rect(x + w*0.6, y + h*0.8, w*0.1, h*0.2).fill(0x32CD32);
+        }
+    }
+  },
+  {
     id: 102,
     type: 'object',
     name: 'Coin',
@@ -236,114 +274,4 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     type: 'object',
     name: 'Player Start',
     category: 'trigger',
-    color: 0x00FF00,
-    attributes: {},
-    renderSVG: () => (
-         <>
-             <circle cx="16" cy="8" r="6" fill="currentColor" />
-             <path d="M8 32 L8 18 Q8 14 16 14 Q24 14 24 18 L24 32" fill="currentColor" />
-             <path d="M4 22 L8 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-             <path d="M28 22 L24 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-         </>
-    ),
-    renderPixi: (g, _l, x, y, w, h) => {
-        const c = 0x00FF00;
-        g.circle(x + w/2, y + h*0.25, 6).fill(c);
-        g.moveTo(x + w/2, y + h*0.45).lineTo(x + w/2, y + h*0.9).stroke({ width: 3, color: c });
-        g.moveTo(x + w*0.2, y + h*0.6).lineTo(x + w*0.8, y + h*0.6).stroke({ width: 3, color: c });
-        g.moveTo(x + w/2, y + h*0.9).lineTo(x + w*0.2, y + h).stroke({ width: 3, color: c });
-        g.moveTo(x + w/2, y + h*0.9).lineTo(x + w*0.8, y + h).stroke({ width: 3, color: c });
-    }
-  },
-  {
-    id: 105,
-    type: 'object',
-    name: 'Flagpole',
-    category: 'trigger',
-    color: 0x00A800,
-    attributes: { win: true },
-    renderSVG: () => (
-         <>
-             <rect x="14" y="2" width="4" height="30" fill="#C0C0C0" />
-             <circle cx="16" cy="2" r="3" fill="#FFD700" />
-             <path d="M18 4 L30 10 L18 16 Z" fill="red" />
-         </>
-    ),
-    renderPixi: (g, _l, x, y, w, h) => {
-        // Base coordinate (Bottom of the object)
-        const baseY = y + h;
-        
-        // Visual Height: Use h if it's large (Game), else default to ~9 tiles (Editor visual)
-        const visualHeight = h > w * 2 ? h : w * 9;
-        const topY = baseY - visualHeight;
-
-        // Pole
-        g.rect(x + w/2 - 2, topY, 4, visualHeight).fill(0xC0C0C0); // Silver pole
-        
-        // Ball at top
-        g.circle(x + w/2, topY, 4).fill(0xFFD700); // Gold ball
-
-        // Flag (Triangle)
-        g.moveTo(x + w/2 + 2, topY + 4)
-         .lineTo(x + w/2 + 2 + w, topY + w/2 + 8)
-         .lineTo(x + w/2 + 2, topY + w + 8)
-         .fill(0xFF0000);
-
-        // Base Block (Green)
-        g.rect(x, baseY - w, w, w).fill(0x00A800);
-        g.rect(x+4, baseY - w+4, w-8, w-8).stroke({ width: 2, color: 0x004400 });
-    }
-  },
-  // --- DECORATION ---
-  {
-    id: 200,
-    type: 'object',
-    name: 'Text Decoration',
-    category: 'decoration',
-    color: 0xFFFFFF,
-    attributes: { solid: false, gravity: false },
-    renderSVG: () => (
-         <text x="16" y="24" fontSize="24" textAnchor="middle" fill="currentColor" fontWeight="bold">T</text>
-    ),
-    renderPixi: (g, labels, x, y, w, h, data) => {
-         if (labels && data?.text) {
-            const t = new PIXI.Text({
-                text: data.text,
-                style: { fontFamily: 'Arial', fontSize: 24, fontWeight: 'bold', fill: 0xFFFFFF, align: 'center' }
-            });
-            t.anchor.set(0.5);
-            t.x = x + w/2;
-            t.y = y + h/2;
-            labels.addChild(t);
-         } else {
-             // Editor preview (when selected but not yet placed, or no text data)
-             // Use stroke to indicate placeholder
-             if (labels) {
-                // We don't have text data in palette preview or if data missing
-                // In palette we likely won't call this with graphics context in same way
-                // But for map rendering:
-                if (!data?.text) {
-                     g.rect(x, y, w, h).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.5 });
-                     const t = new PIXI.Text({
-                        text: 'T',
-                        style: { fontFamily: 'Arial', fontSize: 16, fill: 0xFFFFFF, align: 'center' }
-                    });
-                    t.anchor.set(0.5);
-                    t.x = x + w/2;
-                    t.y = y + h/2;
-                    labels.addChild(t);
-                }
-             }
-         }
-    }
-  }
-];
-
-export const getElementById = (id: number | string | null): RegistryItem | undefined => {
-  if (id === null) return undefined;
-  return GAME_ELEMENTS_REGISTRY.find(el => el.id === id || el.name.toLowerCase() === String(id).toLowerCase());
-};
-
-export const getElementByName = (name: string): RegistryItem | undefined => {
-    return GAME_ELEMENTS_REGISTRY.find(el => el.name.toLowerCase() === name.toLowerCase());
-};
+    
