@@ -36,6 +36,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     onTileClickRef.current = onTileClick;
   }, [onTileClick]);
 
+  // Keep ref to mapData for the ticker
+  const mapDataRef = useRef(mapData);
+  useEffect(() => {
+    mapDataRef.current = mapData;
+  }, [mapData]);
+
   // Initialize Pixi
   useEffect(() => {
     let isMounted = true;
@@ -143,6 +149,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         app.stage.on('pointerup', onPointerUp);
         app.stage.on('pointerupoutside', onPointerUp);
 
+        // Add Rendering Loop
+        app.ticker.add(drawLoop);
+
         setIsAppReady(true);
     };
 
@@ -153,6 +162,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       setIsAppReady(false);
       
       if (appRef.current) {
+        appRef.current.ticker.remove(drawLoop);
         appRef.current.destroy({ removeView: true });
         appRef.current = null;
         graphicsRef.current = null;
@@ -190,12 +200,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   }, [mapData.width, mapData.height, isAppReady]);
 
 
-  // Drawing Loop
-  useEffect(() => {
-    if (!appRef.current || !graphicsRef.current || !labelsContainerRef.current || !isAppReady) return;
+  // Drawing Loop Function
+  const drawLoop = () => {
+    if (!graphicsRef.current || !labelsContainerRef.current) return;
 
     const g = graphicsRef.current;
     const labels = labelsContainerRef.current;
+    const currentMap = mapDataRef.current;
 
     g.clear();
     // Clear previous text labels
@@ -220,31 +231,31 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     };
 
     // --- 1. Draw Ruler Background ---
-    g.rect(0, 0, mapData.width * TILE_SIZE + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a); // Top
-    g.rect(0, 0, RULER_OFFSET, mapData.height * TILE_SIZE + RULER_OFFSET).fill(0x1a1a1a); // Left
+    g.rect(0, 0, currentMap.width * TILE_SIZE + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a); // Top
+    g.rect(0, 0, RULER_OFFSET, currentMap.height * TILE_SIZE + RULER_OFFSET).fill(0x1a1a1a); // Left
     
     // --- 2. Draw Grid & Labels ---
     
     // Vertical Lines & Top Labels
-    for (let x = 0; x <= mapData.width; x++) {
+    for (let x = 0; x <= currentMap.width; x++) {
       const xPos = x * TILE_SIZE + RULER_OFFSET;
       g.moveTo(xPos, RULER_OFFSET);
-      g.lineTo(xPos, mapData.height * TILE_SIZE + RULER_OFFSET);
+      g.lineTo(xPos, currentMap.height * TILE_SIZE + RULER_OFFSET);
       
       // Draw label (skip last line for label if it matches width exactly)
-      if (x < mapData.width) {
+      if (x < currentMap.width) {
           addLabel(`${x}`, xPos + TILE_SIZE/2, RULER_OFFSET / 2);
       }
     }
 
     // Horizontal Lines & Left Labels
-    for (let y = 0; y <= mapData.height; y++) {
+    for (let y = 0; y <= currentMap.height; y++) {
       const yPos = y * TILE_SIZE + RULER_OFFSET;
       g.moveTo(RULER_OFFSET, yPos);
-      g.lineTo(mapData.width * TILE_SIZE + RULER_OFFSET, yPos);
+      g.lineTo(currentMap.width * TILE_SIZE + RULER_OFFSET, yPos);
 
       // Draw label
-      if (y < mapData.height) {
+      if (y < currentMap.height) {
           addLabel(`${y}`, RULER_OFFSET / 2, yPos + TILE_SIZE/2);
       }
     }
@@ -252,7 +263,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
 
     // --- 3. Draw Tiles ---
-    mapData.tiles.forEach((row, y) => {
+    currentMap.tiles.forEach((row, y) => {
       row.forEach((tileId, x) => {
         if (tileId !== 0) {
           const config = GAME_ELEMENTS_REGISTRY.find(el => el.id === tileId);
@@ -266,7 +277,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     });
 
     // --- 4. Draw Objects ---
-    mapData.objects.forEach((obj) => {
+    currentMap.objects.forEach((obj) => {
         const config = GAME_ELEMENTS_REGISTRY.find(el => el.name.toLowerCase() === obj.type.toLowerCase() || (el.type === 'object' && el.name === obj.type));
         
         if (config) {
@@ -276,8 +287,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE, obj);
         }
     });
-
-  }, [mapData, isAppReady]);
+  };
 
   // Determine cursor style based on tool
   const getCursorStyle = () => {

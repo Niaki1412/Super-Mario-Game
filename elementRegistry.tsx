@@ -442,6 +442,38 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     }
   },
   {
+    id: 300,
+    type: 'object',
+    name: 'Cloud',
+    category: 'decoration',
+    color: 0xFFFFFF,
+    attributes: { gravity: false, solid: false },
+    renderSVG: () => (
+        <>
+            <path d="M6 20 Q2 20 2 16 Q2 12 6 10 Q6 4 12 4 Q16 4 18 6 Q20 2 26 6 Q30 6 30 12 Q30 20 26 20 Z" fill="white" stroke="#DDD" strokeWidth="1" />
+        </>
+    ),
+    renderPixi: (g, _l, x, y, w, h) => {
+        // Dynamic Animation: Floating
+        const time = Date.now() / 1000;
+        const offsetY = Math.sin(time * 2) * 3;
+        
+        // Draw Large (2x2 tiles)
+        const dw = w * 2;
+        const dh = h * 1.5;
+        const dy = y + offsetY;
+
+        g.circle(x + dw*0.2, dy + dh*0.6, dw*0.2).fill(0xFFFFFF);
+        g.circle(x + dw*0.4, dy + dh*0.4, dw*0.25).fill(0xFFFFFF);
+        g.circle(x + dw*0.7, dy + dh*0.5, dw*0.22).fill(0xFFFFFF);
+        g.circle(x + dw*0.5, dy + dh*0.7, dw*0.2).fill(0xFFFFFF);
+        g.circle(x + dw*0.8, dy + dh*0.7, dw*0.15).fill(0xFFFFFF);
+        
+        // Bottom fill
+        g.rect(x + dw*0.2, dy + dh*0.6, dw*0.6, dh*0.2).fill(0xFFFFFF);
+    }
+  },
+  {
     id: 999, // Internal
     type: 'object',
     name: 'Bullet',
