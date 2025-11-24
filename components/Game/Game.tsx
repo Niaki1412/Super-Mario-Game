@@ -11,8 +11,10 @@ import { audioManager } from '../../audioManager';
 const DEFAULT_CONTROLS = {
     left: 'a',
     right: 'd',
+    down: 's',
     jump: ' ',
-    shoot: 'i'
+    shoot: 'i',
+    doubleJump: ' '
 };
 
 export const Game: React.FC = () => {
@@ -25,6 +27,7 @@ export const Game: React.FC = () => {
   const entitiesRef = useRef<Entity[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const keysRef = useRef<Record<string, boolean>>({});
+  const prevKeysRef = useRef<Record<string, boolean>>({}); // Track previous frame keys for edge detection
   const scoreRef = useRef(0);
   const isGameOverRef = useRef(false);
   const isWonRef = useRef(false);
@@ -75,7 +78,7 @@ export const Game: React.FC = () => {
   useEffect(() => {
     const saved = localStorage.getItem('MARIO_CONTROLS');
     if (saved) {
-        try { setControls(JSON.parse(saved)); } catch(e) {}
+        try { setControls({ ...DEFAULT_CONTROLS, ...JSON.parse(saved) }); } catch(e) {}
     }
   }, []);
 
@@ -126,6 +129,8 @@ export const Game: React.FC = () => {
         setGameWon(false);
         particlesRef.current = [];
         lastDirRef.current = 1;
+        keysRef.current = {};
+        prevKeysRef.current = {};
 
         // Init Audio
         audioManager.startBGM();
@@ -159,7 +164,9 @@ export const Game: React.FC = () => {
             canShoot: false,
             hasGravity: true,
             invincibleTimer: 0,
-            shootCooldown: 0
+            shootCooldown: 0,
+            jumpCount: 0,
+            isCrouching: false
         });
 
         // Create Enemies & Items
@@ -232,7 +239,10 @@ export const Game: React.FC = () => {
   const updatePhysics = (delta: number) => {
       const map = mapRef.current!;
       const entities = entitiesRef.current;
-      const keys = keysRef.current;
+      // Snapshot keys for consistency in this frame
+      const keys = { ...keysRef.current };
+      const prevKeys = prevKeysRef.current;
+      
       const phys = PLAYER_CONFIG.physics;
 
       // Filter entities
@@ -284,7 +294,6 @@ export const Game: React.FC = () => {
               // Enemy Collision
               entities.forEach(other => {
                   if (other === entity || other.isDead || !other.isEnemy) return;
-                  // Bullets can't kill traps usually, skip spikes
                   if (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike') return;
 
                   if (checkRectCollision(entity, other)) {
@@ -298,8 +307,9 @@ export const Game: React.FC = () => {
               return;
           }
 
-          // 2. Control (Player) - USING DYNAMIC CONTROLS
+          // 2. Control (Player)
           if (entity.isPlayer && !entity.isDead) {
+              // Movement
               if (keys[controls.left]) {
                   entity.vx -= phys.acceleration * delta;
               } else if (keys[controls.right]) {
@@ -308,17 +318,54 @@ export const Game: React.FC = () => {
                   entity.vx *= phys.friction;
               }
 
+              // Crouch Logic
+              if (entity.grounded && keys[controls.down]) {
+                  if (!entity.isCrouching) {
+                      entity.isCrouching = true;
+                      // Reduce height
+                      const originalH = entity.isBig ? PLAYER_CONFIG.big.height : PLAYER_CONFIG.small.height;
+                      entity.h = originalH * 0.6; 
+                      entity.y += (originalH - entity.h); // Push down to align feet
+                  }
+              } else {
+                  if (entity.isCrouching) {
+                       // Stand up
+                       entity.isCrouching = false;
+                       const targetH = entity.isBig ? PLAYER_CONFIG.big.height : PLAYER_CONFIG.small.height;
+                       entity.y -= (targetH - entity.h); // Push up
+                       entity.h = targetH;
+                  }
+              }
+
               // Facing
               if (Math.abs(entity.vx) > 0.1) {
                   lastDirRef.current = Math.sign(entity.vx);
               }
 
-              // Jump
-              if (keys[controls.jump] && entity.grounded) {
-                  const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
-                  entity.vy = force;
-                  entity.grounded = false;
-                  audioManager.playJump();
+              // Jump Detection (Just Pressed)
+              const jumpJustPressed = keys[controls.jump] && !prevKeys[controls.jump];
+              const doubleJumpJustPressed = keys[controls.doubleJump] && !prevKeys[controls.doubleJump];
+              const jumpRequested = jumpJustPressed || doubleJumpJustPressed;
+
+              if (entity.grounded) {
+                  entity.jumpCount = 0; // Reset jumps
+                  if (jumpRequested) {
+                      const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
+                      entity.vy = force;
+                      entity.grounded = false;
+                      entity.jumpCount = 1;
+                      audioManager.playJump();
+                  }
+              } else {
+                  // Air Logic / Double Jump
+                  // Allow double jump if we haven't used it (jumpCount < 2) and jump key is pressed fresh
+                  if (jumpRequested && (entity.jumpCount || 0) < 2) {
+                      const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
+                      entity.vy = force * 0.9; // Slightly weaker double jump?
+                      entity.jumpCount = (entity.jumpCount || 0) + 1;
+                      audioManager.playJump();
+                      spawnParticles(entity.x, entity.y + entity.h, 0xFFFFFF); // Cloud effect
+                  }
               }
               
               // Shoot
@@ -416,7 +463,7 @@ export const Game: React.FC = () => {
                else if (entity.isShell && Math.abs(entity.vx) > 2) {
                    entities.forEach(other => {
                        if (other === entity || other.isDead || other.isPlayer || other.isEffect || other.isBullet) return;
-                       if (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike') return; // Shells bounce off traps? or just ignore
+                       if (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike') return;
 
                        if (other.isEnemy && checkRectCollision(entity, other)) {
                            other.isDead = true;
@@ -504,14 +551,8 @@ export const Game: React.FC = () => {
                               return;
                           }
 
-                          // Rotating Spike collision is special (circle/ball collision)
                           if (other.type === 'Rotating Spike') {
-                              // Collision logic will be handled outside this block because the ball rect is different
-                              // from the entity rect. But since we are iterating, we can check here.
-                              // BUT: checkRectCollision passed true already for the Pivot.
-                              // The Pivot is safe (unless we want it lethal).
-                              // We need to check the ball explicitly.
-                              return; // Skip default enemy check, handled below explicitly
+                              return; 
                           }
 
                           const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
@@ -570,7 +611,6 @@ export const Game: React.FC = () => {
                       }
                   }
 
-                  // Handle Rotating Spike Ball Collision separately (can be far from pivot)
                   if (other.type === 'Rotating Spike') {
                       const angle = other.rotationAngle || 0;
                       const radius = other.w * 2.5;
@@ -595,6 +635,9 @@ export const Game: React.FC = () => {
               });
           }
       });
+
+      // Update Prev Keys
+      prevKeysRef.current = { ...keys };
   };
 
   const spawnBullet = (player: Entity) => {
@@ -766,6 +809,7 @@ export const Game: React.FC = () => {
       const h = e.h;
       const isBig = e.isBig;
       const canShoot = e.canShoot;
+      const isCrouching = e.isCrouching;
       
       const isRight = lastDirRef.current > 0;
       const colors = canShoot ? PLAYER_CONFIG.fireAppearance : PLAYER_CONFIG.appearance;
@@ -776,17 +820,22 @@ export const Game: React.FC = () => {
       const tick = Date.now() / 150;
       const animOffset = isRunning ? Math.sin(tick) * (w * 0.15) : 0;
       
+      // If Crouching, we squash visually vertically (already adjusted H, but let's draw compact)
+      
       const legH = isBig ? h * 0.2 : h * 0.25;
       const bodyH = isBig ? h * 0.4 : h * 0.4;
       const headH = isBig ? h * 0.25 : h * 0.35;
       
+      // Legs
       const legW = w * 0.25;
       const blX = w * 0.2 + animOffset;
       g.rect(tx(blX, legW), y + h - legH, legW, legH).fill(colors.overalls);
       const flX = w * 0.55 - animOffset;
       g.rect(tx(flX, legW), y + h - legH, legW, legH).fill(colors.overalls);
 
+      // Body
       const bodyY = y + h - legH - bodyH;
+      // If crouching, body is lower/shorter visually? No, hitbox h handles size, draw normally relative to x/y/w/h
       g.rect(tx(w*0.2, w*0.6), bodyY, w*0.6, bodyH).fill(colors.overalls);
       g.rect(tx(w*0.15, w*0.7), bodyY, w*0.7, bodyH * 0.6).fill(colors.shirt);
       
@@ -796,6 +845,7 @@ export const Game: React.FC = () => {
       g.circle(tx(w*0.275, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
       g.circle(tx(w*0.725, 0), bodyY + bodyH * 0.4, 2).fill(colors.buttons);
 
+      // Arms
       const armY = bodyY + bodyH * 0.1;
       const baX = w * 0.1 + animOffset;
       g.rect(tx(baX, w*0.2), armY, w*0.2, bodyH * 0.5).fill(colors.shirt);
@@ -804,6 +854,7 @@ export const Game: React.FC = () => {
       g.circle(tx(baX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
       g.circle(tx(faX + w*0.1, 0), armY + bodyH * 0.5, w*0.12).fill(colors.skin);
 
+      // Head
       const headSize = w * 0.75;
       const headX = w * 0.125;
       const headY = bodyY - headH;
@@ -812,6 +863,8 @@ export const Game: React.FC = () => {
       const hatH = headH * 0.4;
       g.rect(tx(headX - w*0.05, headSize + w*0.1), headY - hatH*0.5, headSize + w*0.1, hatH + 2).fill(colors.hat);
       g.rect(tx(w*0.45, w*0.5), headY, w*0.5, hatH * 0.5).fill(colors.hat);
+      
+      // If crouching, maybe lower eyes?
       g.rect(tx(w*0.15, w*0.15), headY + headH*0.5, w*0.15, headH*0.3).fill(colors.hair);
       g.rect(tx(w*0.1, w*0.1), headY + headH*0.6, w*0.1, headH*0.2).fill(colors.hair);
       g.rect(tx(w*0.55, w*0.3), headY + headH * 0.7, w*0.3, headH*0.2).fill(colors.hair);
@@ -940,7 +993,9 @@ export const Game: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                       {Object.entries(controls).map(([action, key]) => (
                           <div key={action} className="flex flex-col">
-                              <span className="text-xs text-gray-500 uppercase font-bold mb-1">{action}</span>
+                              <span className="text-xs text-gray-500 uppercase font-bold mb-1">
+                                {action.replace(/([A-Z])/g, ' $1')}
+                              </span>
                               <button 
                                   onClick={() => setBindingAction(action as keyof typeof DEFAULT_CONTROLS)}
                                   className={`
@@ -971,7 +1026,7 @@ export const Game: React.FC = () => {
             SCORE: {score}
         </div>
         <div className="absolute top-10 left-4 text-white font-mono text-xs opacity-70 drop-shadow-md z-10 select-none">
-            CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} to Move, {getKeyDisplay(controls.jump)} to Jump, {getKeyDisplay(controls.shoot)} to Shoot
+            CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} Move, {getKeyDisplay(controls.down)} Crouch, {getKeyDisplay(controls.jump)} Jump, {getKeyDisplay(controls.doubleJump)} Double Jump
         </div>
 
         <button 

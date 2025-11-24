@@ -75,6 +75,8 @@ export interface Entity extends Rect {
   canShoot?: boolean;
   invincibleTimer?: number;
   shootCooldown?: number;
+  jumpCount?: number; // For double jump
+  isCrouching?: boolean; // For crouch state
   
   // Enemy specific
   patrolCenter?: number;
