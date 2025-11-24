@@ -169,7 +169,8 @@ export const Game: React.FC = () => {
                 isEnemy: config.category === 'enemy',
                 isCollectible: config.category === 'collectible',
                 patrolCenter: obj.x,
-                hasGravity: config.attributes?.gravity ?? true // Default to true if not specified
+                hasGravity: config.attributes?.gravity ?? true, // Default to true if not specified
+                text: obj.text
             });
         });
 
@@ -569,7 +570,8 @@ export const Game: React.FC = () => {
               const config = getElementByName(e.type);
               
               if (config && config.name !== 'Invisible Death Block') {
-                 config.renderPixi(g, labels, e.x, e.y, e.w, e.h);
+                 // Pass the entity data as the 7th argument
+                 config.renderPixi(g, labels, e.x, e.y, e.w, e.h, e);
               }
           }
       });

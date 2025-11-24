@@ -14,7 +14,7 @@ export interface ElementConfig {
   id: number; // For tiles, 0 is empty
   type: 'tile' | 'object';
   name: string;
-  category: 'terrain' | 'enemy' | 'collectible' | 'trigger';
+  category: 'terrain' | 'enemy' | 'collectible' | 'trigger' | 'decoration';
   color: number; // Hex color for editor visualization
   description?: string;
   // Specific attributes based on category
@@ -37,6 +37,7 @@ export interface GameObjectData {
   x: number; // Pixel X
   y: number; // Pixel Y
   variant?: string;
+  text?: string; // Content for Text elements
 }
 
 export interface EditorState {
@@ -76,6 +77,9 @@ export interface Entity extends Rect {
 
   // Physics specific
   hasGravity?: boolean;
+
+  // Decoration specific
+  text?: string;
 }
 
 export interface Particle {

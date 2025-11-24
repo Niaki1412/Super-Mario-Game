@@ -5,7 +5,7 @@ import { ElementConfig } from './types';
 
 export interface RegistryItem extends ElementConfig {
     renderSVG: () => React.ReactNode;
-    renderPixi: (g: PIXI.Graphics, labels: PIXI.Container | null, x: number, y: number, w: number, h: number) => void;
+    renderPixi: (g: PIXI.Graphics, labels: PIXI.Container | null, x: number, y: number, w: number, h: number, data?: any) => void;
 }
 
 export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
@@ -292,6 +292,49 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
         // Base Block (Green)
         g.rect(x, baseY - w, w, w).fill(0x00A800);
         g.rect(x+4, baseY - w+4, w-8, w-8).stroke({ width: 2, color: 0x004400 });
+    }
+  },
+  // --- DECORATION ---
+  {
+    id: 200,
+    type: 'object',
+    name: 'Text Decoration',
+    category: 'decoration',
+    color: 0xFFFFFF,
+    attributes: { solid: false },
+    renderSVG: () => (
+         <text x="16" y="24" fontSize="24" textAnchor="middle" fill="currentColor" fontWeight="bold">T</text>
+    ),
+    renderPixi: (g, labels, x, y, w, h, data) => {
+         if (labels && data?.text) {
+            const t = new PIXI.Text({
+                text: data.text,
+                style: { fontFamily: 'Arial', fontSize: 24, fontWeight: 'bold', fill: 0xFFFFFF, align: 'center' }
+            });
+            t.anchor.set(0.5);
+            t.x = x + w/2;
+            t.y = y + h/2;
+            labels.addChild(t);
+         } else {
+             // Editor preview (when selected but not yet placed, or no text data)
+             // Use stroke to indicate placeholder
+             if (labels) {
+                // We don't have text data in palette preview or if data missing
+                // In palette we likely won't call this with graphics context in same way
+                // But for map rendering:
+                if (!data?.text) {
+                     g.rect(x, y, w, h).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.5 });
+                     const t = new PIXI.Text({
+                        text: 'T',
+                        style: { fontFamily: 'Arial', fontSize: 16, fill: 0xFFFFFF, align: 'center' }
+                    });
+                    t.anchor.set(0.5);
+                    t.x = x + w/2;
+                    t.y = y + h/2;
+                    labels.addChild(t);
+                }
+             }
+         }
     }
   }
 ];

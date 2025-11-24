@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { GameMap } from '../../types';
@@ -235,7 +236,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         if (config) {
             const drawX = obj.x + RULER_OFFSET;
             const drawY = obj.y + RULER_OFFSET;
-            config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE);
+            // Pass the object data as the 7th argument
+            config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE, obj);
         }
     });
 

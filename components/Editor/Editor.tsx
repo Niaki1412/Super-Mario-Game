@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AssetPalette } from './AssetPalette';
@@ -115,12 +116,22 @@ export const Editor: React.FC = () => {
       newTiles[y][x] = element.id;
       setMapData(prev => ({ ...prev, tiles: newTiles }));
     } else {
+      let textContent: string | undefined = undefined;
+
+      // Handle Text Element
+      if (element.name === 'Text Decoration') {
+          const input = prompt("Enter a single character:", "A");
+          if (!input) return; // Cancelled
+          textContent = input.substring(0, 1);
+      }
+
       // Add Object
       const newObj: GameObjectData = {
         id: crypto.randomUUID(),
         type: element.name, // Storing name as type reference for JSON
         x: x * TILE_SIZE, // Snap to grid for now, can be freeform later
-        y: y * TILE_SIZE
+        y: y * TILE_SIZE,
+        text: textContent
       };
       setMapData(prev => ({ ...prev, objects: [...prev.objects, newObj] }));
     }
