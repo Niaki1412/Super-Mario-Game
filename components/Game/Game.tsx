@@ -129,7 +129,8 @@ export const Game: React.FC = () => {
             grounded: false,
             isPlayer: true,
             isBig: false,
-            hasGravity: true
+            hasGravity: true,
+            invincibleTimer: 0
         });
 
         // Create Enemies & Items
@@ -232,6 +233,12 @@ export const Game: React.FC = () => {
                   audioManager.playJump();
               }
 
+              // Invincibility Timer
+              if (entity.invincibleTimer && entity.invincibleTimer > 0) {
+                  entity.invincibleTimer -= delta / 60; // Approx seconds
+                  if (entity.invincibleTimer < 0) entity.invincibleTimer = 0;
+              }
+
               // Clamp Speed
               if (entity.vx > phys.runSpeed) entity.vx = phys.runSpeed;
               if (entity.vx < -phys.runSpeed) entity.vx = -phys.runSpeed;
@@ -275,13 +282,15 @@ export const Game: React.FC = () => {
                               audioManager.playStomp();
                           } else {
                               // Damage logic
-                              if (entity.isBig) {
+                              if (entity.invincibleTimer && entity.invincibleTimer > 0) {
+                                  // Invincible, ignore hit
+                              } else if (entity.isBig) {
                                   // Shrink
                                   entity.isBig = false;
                                   entity.h = PLAYER_CONFIG.small.height;
                                   entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; // Adjust pos
-                                  audioManager.playBump(); // Or a shrink sound
-                                  // Invincibility would go here
+                                  audioManager.playBump(); 
+                                  entity.invincibleTimer = 1.0; // 1 second invincibility
                               } else {
                                   die();
                               }
@@ -407,6 +416,12 @@ export const Game: React.FC = () => {
   // --- RENDERING ---
   
   const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
+      // Invincibility Flicker
+      if (e.invincibleTimer && e.invincibleTimer > 0) {
+          // Flicker every ~0.1s (assuming 60fps, every 6 frames)
+          if (Math.floor(Date.now() / 80) % 2 === 0) return;
+      }
+
       const x = e.x;
       const y = e.y;
       const w = e.w;
