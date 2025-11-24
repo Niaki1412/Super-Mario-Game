@@ -191,9 +191,11 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     attributes: { points: 200, gravity: true, speed: 1 },
     renderSVG: () => (
         <>
-            <ellipse cx="16" cy="20" rx="10" ry="8" fill="currentColor" />
-            <circle cx="10" cy="12" r="5" fill="currentColor" />
-            <path d="M12 26 L8 30 M20 26 L24 30" stroke="currentColor" strokeWidth="3" />
+            <ellipse cx="16" cy="20" rx="10" ry="8" fill="#006400" />
+            <ellipse cx="16" cy="20" rx="7" ry="5" stroke="rgba(255,255,255,0.3)" fill="none" />
+            <circle cx="10" cy="12" r="5" fill="#32CD32" />
+            <circle cx="9" cy="11" r="1.5" fill="black" />
+            <path d="M12 26 L8 30 M20 26 L24 30" stroke="#32CD32" strokeWidth="3" />
         </>
     ),
     renderPixi: (g, _l, x, y, w, h, data) => {
@@ -205,18 +207,18 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
              g.ellipse(x + w/2, y + h*0.8, w*0.3, h*0.15).stroke({ width: 2, color: 0xFFFFFF, alpha: 0.3 });
         } else {
             // Walking State
+            // Legs
+            g.rect(x + w*0.2, y + h*0.75, w*0.15, h*0.25).fill(0x32CD32);
+            g.rect(x + w*0.65, y + h*0.75, w*0.15, h*0.25).fill(0x32CD32);
+            
             // Head
-            g.circle(x + w*0.2, y + h*0.3, w*0.15).fill(0x32CD32);
+            g.circle(x + w*0.25, y + h*0.35, w*0.2).fill(0x32CD32);
             // Eye
-            g.circle(x + w*0.15, y + h*0.3, 2).fill(0x000000);
+            g.circle(x + w*0.2, y + h*0.3, 2).fill(0x000000);
             
             // Shell Body
-            g.ellipse(x + w*0.5, y + h*0.6, w*0.35, h*0.25).fill(0x006400);
-            g.ellipse(x + w*0.5, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
-            
-            // Legs
-            g.rect(x + w*0.3, y + h*0.8, w*0.1, h*0.2).fill(0x32CD32);
-            g.rect(x + w*0.6, y + h*0.8, w*0.1, h*0.2).fill(0x32CD32);
+            g.ellipse(x + w*0.55, y + h*0.6, w*0.35, h*0.25).fill(0x006400);
+            g.ellipse(x + w*0.55, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
         }
     }
   },
@@ -274,4 +276,85 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     type: 'object',
     name: 'Player Start',
     category: 'trigger',
-    
+    color: 0x00FF00,
+    attributes: { gravity: false },
+    renderSVG: () => (
+        <>
+            <rect x="4" y="4" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="4 2" />
+            <text x="16" y="21" fontSize="16" textAnchor="middle" fill="currentColor">S</text>
+        </>
+    ),
+    renderPixi: (g, _l, x, y, w, h) => {
+        g.rect(x + 4, y + 4, w - 8, h - 8).stroke({ width: 2, color: 0x00FF00 });
+        // S for start
+        g.moveTo(x + 10, y + 10).lineTo(x+22, y+10).lineTo(x+10, y+22).lineTo(x+22, y+22).stroke({width: 2, color: 0x00FF00});
+    }
+  },
+  {
+    id: 105,
+    type: 'object',
+    name: 'Flagpole',
+    category: 'trigger',
+    color: 0xFFFFFF,
+    attributes: { gravity: false, win: true },
+    renderSVG: () => (
+         <>
+            <rect x="14" y="2" width="4" height="26" fill="gray" />
+            <rect x="8" y="28" width="16" height="4" fill="brown" />
+            <path d="M18 4 L30 8 L18 12 Z" fill="red" />
+            <circle cx="16" cy="2" r="2" fill="gold" />
+         </>
+    ),
+    renderPixi: (g, _l, x, y, w, h) => {
+        const poleH = h * 9; // Draw upwards
+        // Base
+        g.rect(x + w*0.2, y + h*0.8, w*0.6, h*0.2).fill(0x8B4513);
+        // Pole
+        g.rect(x + w*0.4, y - poleH + h, w*0.2, poleH).fill(0x708090);
+        // Top Ball
+        g.circle(x + w*0.5, y - poleH + h, w*0.15).fill(0xFFD700);
+        // Flag (Triangle)
+        g.moveTo(x + w*0.6, y - poleH + h + h*0.5)
+         .lineTo(x + w*0.6 + w, y - poleH + h + h)
+         .lineTo(x + w*0.6, y - poleH + h + h*1.5)
+         .fill(0xFF0000);
+    }
+  },
+  {
+    id: 200,
+    type: 'object',
+    name: 'Text Decoration',
+    category: 'decoration',
+    color: 0xFFFFFF,
+    attributes: { gravity: false },
+    renderSVG: () => (
+        <>
+            <rect x="2" y="6" width="28" height="20" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" />
+            <text x="16" y="22" fontSize="18" textAnchor="middle" fill="currentColor">Ab</text>
+        </>
+    ),
+    renderPixi: (g, labels, x, y, w, h, data) => {
+        if (labels && data?.text) {
+             const t = new PIXI.Text({
+                text: data.text,
+                style: { fontFamily: 'Arial', fontSize: 24, fontWeight: 'bold', fill: 0xFFFFFF, align: 'center', stroke: {color: 0x000000, width: 3} }
+            });
+            t.anchor.set(0.5);
+            t.x = x + w/2;
+            t.y = y + h/2;
+            labels.addChild(t);
+        } else {
+             // Placeholder if no text in data (e.g. palette)
+             g.rect(x, y, w, h).stroke({width: 1, color: 0xFFFFFF, alpha: 0.5});
+             if(labels && !data) { // Palette view
+                 const t = new PIXI.Text({ text: 'T', style: { fill: 0xFFFFFF, fontSize: 14 }});
+                 t.anchor.set(0.5); t.x = x+w/2; t.y = y+h/2;
+                 labels.addChild(t);
+             }
+        }
+    }
+  }
+];
+
+export const getElementById = (id: number | string | null) => GAME_ELEMENTS_REGISTRY.find(e => e.id === id);
+export const getElementByName = (name: string) => GAME_ELEMENTS_REGISTRY.find(e => e.name === name);

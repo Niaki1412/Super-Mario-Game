@@ -170,7 +170,8 @@ export const Game: React.FC = () => {
                 isCollectible: config.category === 'collectible',
                 patrolCenter: obj.x,
                 hasGravity: config.attributes?.gravity ?? true, // Default to true if not specified
-                text: obj.text
+                text: obj.text,
+                isShell: false // Init for Turtles
             });
         });
 
@@ -266,9 +267,24 @@ export const Game: React.FC = () => {
               }
           }
 
-          // 3. AI Movement
+          // 3. AI Movement & Shell Mechanics
           if (entity.isEnemy) {
-               // Simple patrol handled in collision
+               // If it's a moving shell, it shouldn't be slowed by friction logic (if we had any for enemies)
+               // But standard enemies also have constant velocity here usually.
+               
+               // Check collisions with OTHER enemies (Shell Killing)
+               if (entity.isShell && Math.abs(entity.vx) > 2) {
+                   entities.forEach(other => {
+                       if (other === entity || other.isDead || other.isPlayer) return;
+                       if (other.isEnemy && checkRectCollision(entity, other)) {
+                           // Kill the other enemy
+                           other.isDead = true;
+                           addScore(200);
+                           spawnParticles(other.x, other.y, 0xFFFFFF);
+                           audioManager.playStomp();
+                       }
+                   });
+               }
           }
 
 
@@ -295,28 +311,70 @@ export const Game: React.FC = () => {
                       }
 
                       if (other.isEnemy) {
-                          // Jump on top?
-                          // Player bottom < Enemy Center Y (approx) and Player falling
-                          if (entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.5) {
-                              // Kill Enemy
-                              other.isDead = true;
-                              entity.vy = phys.bounceForce; // Bounce
-                              addScore(100);
-                              spawnParticles(other.x, other.y, 0xA0522D);
-                              audioManager.playStomp();
-                          } else {
-                              // Damage logic
-                              if (entity.invincibleTimer && entity.invincibleTimer > 0) {
-                                  // Invincible, ignore hit
-                              } else if (entity.isBig) {
-                                  // Shrink
-                                  entity.isBig = false;
-                                  entity.h = PLAYER_CONFIG.small.height;
-                                  entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; // Adjust pos
-                                  audioManager.playBump(); 
-                                  entity.invincibleTimer = 1.0; // 1 second invincibility
+                          // --- Enemy Collision Logic ---
+
+                          // Check Stomp (Player is falling and above enemy)
+                          const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
+
+                          if (isStomp) {
+                              if (other.type === 'Turtle') {
+                                  // Turtle Specifics
+                                  entity.vy = phys.bounceForce; // Bounce
+                                  audioManager.playStomp();
+
+                                  if (!other.isShell) {
+                                      // Walk -> Shell (Stop)
+                                      other.isShell = true;
+                                      other.vx = 0;
+                                      addScore(100);
+                                  } else {
+                                      // Shell -> Stop (if moving) or Kick (if stopped)?
+                                      // Classic: Stomping a moving shell stops it. Stomping a stopped shell kicks it?
+                                      // Actually usually stomping a shell stops it.
+                                      if (Math.abs(other.vx) > 0.1) {
+                                          other.vx = 0; // Stop
+                                      } else {
+                                          // Kick if stomped while stopped? Let's say yes for fun, or just keep stopped.
+                                          // Let's just keep it stopped if stomped.
+                                          other.vx = 0;
+                                      }
+                                  }
                               } else {
-                                  die();
+                                  // Standard Enemy (Goomba) -> Die
+                                  other.isDead = true;
+                                  entity.vy = phys.bounceForce; 
+                                  addScore(100);
+                                  spawnParticles(other.x, other.y, 0xA0522D);
+                                  audioManager.playStomp();
+                              }
+                          } else {
+                              // --- Side Collision (Not Stomp) ---
+                              
+                              if (other.type === 'Turtle' && other.isShell && Math.abs(other.vx) < 0.1) {
+                                  // Kick the shell!
+                                  const dir = entity.x < other.x ? 1 : -1;
+                                  other.vx = dir * 8; // High speed
+                                  // Move shell slightly out of player to prevent immediate re-collision/damage
+                                  other.x += dir * 4; 
+                                  audioManager.playBump(); // Kick sound
+                              } else {
+                                  // Damage Logic
+                                  // If Invincible, ignore
+                                  if (entity.invincibleTimer && entity.invincibleTimer > 0) {
+                                      return;
+                                  }
+                                  
+                                  // If Big, Shrink
+                                  if (entity.isBig) {
+                                      entity.isBig = false;
+                                      entity.h = PLAYER_CONFIG.small.height;
+                                      entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; 
+                                      audioManager.playBump(); 
+                                      entity.invincibleTimer = 1.0; 
+                                  } else {
+                                      // Die
+                                      die();
+                                  }
                               }
                           }
                       } else if (other.isCollectible) {
@@ -365,11 +423,20 @@ export const Game: React.FC = () => {
                       if (entity.vx > 0) {
                           // Moving Right
                           entity.x = tileRect.x - entity.w;
-                          entity.vx = entity.isEnemy ? -entity.vx : 0; // Enemies turn
+                          // Bounce logic for shells, Turn logic for normal enemies
+                          if (entity.isEnemy) {
+                              entity.vx = -entity.vx;
+                          } else {
+                              entity.vx = 0;
+                          }
                       } else if (entity.vx < 0) {
                           // Moving Left
                           entity.x = tileRect.x + tileRect.w;
-                          entity.vx = entity.isEnemy ? -entity.vx : 0;
+                          if (entity.isEnemy) {
+                              entity.vx = -entity.vx;
+                          } else {
+                              entity.vx = 0;
+                          }
                       }
                   } else {
                       if (entity.vy > 0) {
