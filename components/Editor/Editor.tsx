@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AssetPalette } from './AssetPalette';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -7,12 +7,15 @@ import { GameMap, GameObjectData } from '../../types';
 import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, TOOL_ERASER } from '../../constants';
 import { getElementById } from '../../elementRegistry';
 
+const STORAGE_KEY = 'MARIO_MAP_DATA';
+
 export const Editor: React.FC = () => {
   const navigate = useNavigate();
 
   // --- State ---
   const [selectedElementId, setSelectedElementId] = useState<number | string | null>(1); // Default to Ground
   const [mapName, setMapName] = useState("my_mario_map");
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [mapData, setMapData] = useState<GameMap>({
     width: DEFAULT_MAP_WIDTH,
     height: DEFAULT_MAP_HEIGHT,
@@ -22,7 +25,40 @@ export const Editor: React.FC = () => {
     objects: []
   });
 
+  // --- Init ---
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.mapData) {
+            // Restore map data
+            setMapData(parsed.mapData);
+        }
+        if (parsed.mapName) setMapName(parsed.mapName);
+        if (parsed.lastSaved) setLastSaved(new Date(parsed.lastSaved));
+      } catch (e) {
+        console.error("Failed to load map from storage", e);
+      }
+    }
+  }, []);
+
   // --- Handlers ---
+
+  const handleSaveToStorage = () => {
+    const now = new Date();
+    const payload = {
+      mapData,
+      mapName,
+      lastSaved: now.toISOString()
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      setLastSaved(now);
+    } catch (e) {
+      alert("Failed to save to local storage (quota might be full).");
+    }
+  };
 
   // Update map properties (width/height) while preserving data
   const handleUpdateMap = (newData: Partial<GameMap>) => {
@@ -162,10 +198,12 @@ export const Editor: React.FC = () => {
       <PropertiesPanel 
         mapData={mapData}
         mapName={mapName}
+        lastSaved={lastSaved}
         onMapNameChange={setMapName}
         onUpdateMap={handleUpdateMap}
         onExport={handleExport}
         onImport={handleImport}
+        onSave={handleSaveToStorage}
       />
     </div>
   );

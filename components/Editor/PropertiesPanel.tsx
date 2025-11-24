@@ -1,22 +1,27 @@
 import React from 'react';
 import { GameMap } from '../../types';
+import { Save } from 'lucide-react';
 
 interface PropertiesPanelProps {
   mapData: GameMap;
   mapName: string;
+  lastSaved: Date | null;
   onMapNameChange: (name: string) => void;
   onUpdateMap: (newData: Partial<GameMap>) => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSave: () => void;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
   mapData, 
   mapName,
+  lastSaved,
   onMapNameChange,
   onUpdateMap, 
   onExport,
-  onImport 
+  onImport,
+  onSave
 }) => {
   
   const handleDimensionChange = (key: 'width' | 'height', value: string) => {
@@ -102,7 +107,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </ul>
       </div>
 
-      <div className="mt-auto space-y-3">
+      <div className="mt-auto space-y-3 pt-6 border-t border-gray-800">
+         
+         {lastSaved && (
+             <div className="text-xs text-gray-500 text-center mb-1">
+                 Last saved: {lastSaved.toLocaleTimeString()}
+             </div>
+         )}
+
+         <button 
+            onClick={onSave}
+            className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow transition-colors flex justify-center items-center gap-2"
+         >
+            <Save size={16} />
+            <span>Save to Browser</span>
+         </button>
+
          <div className="relative">
              <input
                 type="file"
@@ -110,16 +130,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 onChange={onImport}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
              />
-             <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded border border-gray-600 transition-colors">
+             <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded border border-gray-600 transition-colors text-sm">
                 Import JSON
              </button>
          </div>
 
         <button 
           onClick={onExport}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded shadow-lg transition-colors flex justify-center items-center gap-2"
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded shadow-lg transition-colors flex justify-center items-center gap-2 text-sm"
         >
-          <span>Export Map</span>
+          <span>Export JSON</span>
         </button>
       </div>
     </div>
