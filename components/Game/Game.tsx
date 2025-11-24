@@ -26,6 +26,7 @@ export const Game: React.FC = () => {
   // React State for UI Overlay
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const [gameWon, setGameWon] = useState(false);
   const [currentMap, setCurrentMap] = useState<GameMap | null>(null);
 
   // --- HELPERS ---
@@ -97,6 +98,7 @@ export const Game: React.FC = () => {
         isGameOverRef.current = false;
         setGameOver(false);
         isWonRef.current = false;
+        setGameWon(false);
         particlesRef.current = [];
         lastDirRef.current = 1;
 
@@ -139,13 +141,27 @@ export const Game: React.FC = () => {
             const config = getElementByName(obj.type);
             if (!config) return;
 
+            // Handle Flagpole specifically to make it a tall hitbox
+            let h = TILE_SIZE;
+            let y = obj.y;
+            
+            if (config.name === 'Flagpole') {
+                 h = TILE_SIZE * 9;
+                 // Shift y up so the base is at obj.y + TILE_SIZE - h?
+                 // No, in registry renderPixi draws up from the base.
+                 // We want the hitbox to cover the pole.
+                 // The 'obj.y' is where the user clicked, representing the base block.
+                 // So the hitbox top is y - (h - TILE_SIZE)
+                 y = obj.y - (h - TILE_SIZE);
+            }
+
             newEntities.push({
                 id: obj.id,
                 type: obj.type,
                 x: obj.x,
-                y: obj.y,
+                y: y,
                 w: TILE_SIZE,
-                h: TILE_SIZE,
+                h: h,
                 vx: config.category === 'enemy' ? -1 : 0, // Enemies start moving left
                 vy: 0,
                 isDead: false,
@@ -270,6 +286,13 @@ export const Game: React.FC = () => {
                   if (entity === other || other.isDead) return;
 
                   if (checkRectCollision(entity, other)) {
+                      const config = getElementByName(other.type);
+
+                      if (config?.attributes?.win) {
+                          winLevel();
+                          return;
+                      }
+
                       if (other.isEnemy) {
                           // Jump on top?
                           // Player bottom < Enemy Center Y (approx) and Player falling
@@ -298,7 +321,6 @@ export const Game: React.FC = () => {
                       } else if (other.isCollectible) {
                           // Collect
                           other.isDead = true;
-                          const config = getElementByName(other.type);
                           if (config?.attributes?.points) addScore(config.attributes.points);
                           
                           // Effects
@@ -380,7 +402,7 @@ export const Game: React.FC = () => {
   };
 
   const die = () => {
-      if (isGameOverRef.current) return;
+      if (isGameOverRef.current || isWonRef.current) return;
       isGameOverRef.current = true;
       setGameOver(true);
       
@@ -392,6 +414,13 @@ export const Game: React.FC = () => {
           player.vy = PLAYER_CONFIG.small.jumpForce;
           player.isDead = true; 
       }
+  };
+
+  const winLevel = () => {
+      if (isGameOverRef.current || isWonRef.current) return;
+      isWonRef.current = true;
+      setGameWon(true);
+      audioManager.playWin();
   };
 
   const addScore = (amount: number) => {
@@ -629,6 +658,21 @@ export const Game: React.FC = () => {
                         className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded shadow-lg"
                     >
                         Quit
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {gameWon && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-500/80 z-20 backdrop-blur-sm">
+                <h1 className="text-6xl text-yellow-300 font-black mb-4 animate-bounce drop-shadow-md border-stroke">LEVEL CLEARED!</h1>
+                <p className="text-white text-2xl font-bold mb-8 drop-shadow">Score: {score}</p>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={() => navigate('/')}
+                        className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all"
+                    >
+                        Return to Menu
                     </button>
                 </div>
             </div>

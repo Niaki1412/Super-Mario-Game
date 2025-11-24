@@ -1,3 +1,4 @@
+
 import React from 'react';
 import * as PIXI from 'pixi.js';
 import { ElementConfig } from './types';
@@ -133,10 +134,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
         </>
     ),
     renderPixi: (g, labels, x, y, w, h) => {
-        // Only visible in Editor. Logic handled by caller or we draw a helper here.
-        // We will draw it as a helper (dashed) which can be ignored by Game loop if needed, 
-        // but typically Game loop won't call render for invisible items or we check context.
-        // For now, we draw the "Editor View" version.
         g.rect(x+2, y+2, w-4, h-4).stroke({ width: 2, color: 0x800080 });
         if (labels) {
              const t = new PIXI.Text({
@@ -256,6 +253,45 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
         g.moveTo(x + w*0.2, y + h*0.6).lineTo(x + w*0.8, y + h*0.6).stroke({ width: 3, color: c });
         g.moveTo(x + w/2, y + h*0.9).lineTo(x + w*0.2, y + h).stroke({ width: 3, color: c });
         g.moveTo(x + w/2, y + h*0.9).lineTo(x + w*0.8, y + h).stroke({ width: 3, color: c });
+    }
+  },
+  {
+    id: 105,
+    type: 'object',
+    name: 'Flagpole',
+    category: 'trigger',
+    color: 0x00A800,
+    attributes: { win: true },
+    renderSVG: () => (
+         <>
+             <rect x="14" y="2" width="4" height="30" fill="#C0C0C0" />
+             <circle cx="16" cy="2" r="3" fill="#FFD700" />
+             <path d="M18 4 L30 10 L18 16 Z" fill="red" />
+         </>
+    ),
+    renderPixi: (g, _l, x, y, w, h) => {
+        // Base coordinate (Bottom of the object)
+        const baseY = y + h;
+        
+        // Visual Height: Use h if it's large (Game), else default to ~9 tiles (Editor visual)
+        const visualHeight = h > w * 2 ? h : w * 9;
+        const topY = baseY - visualHeight;
+
+        // Pole
+        g.rect(x + w/2 - 2, topY, 4, visualHeight).fill(0xC0C0C0); // Silver pole
+        
+        // Ball at top
+        g.circle(x + w/2, topY, 4).fill(0xFFD700); // Gold ball
+
+        // Flag (Triangle)
+        g.moveTo(x + w/2 + 2, topY + 4)
+         .lineTo(x + w/2 + 2 + w, topY + w/2 + 8)
+         .lineTo(x + w/2 + 2, topY + w + 8)
+         .fill(0xFF0000);
+
+        // Base Block (Green)
+        g.rect(x, baseY - w, w, w).fill(0x00A800);
+        g.rect(x+4, baseY - w+4, w-8, w-8).stroke({ width: 2, color: 0x004400 });
     }
   }
 ];

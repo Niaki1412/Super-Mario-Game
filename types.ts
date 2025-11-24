@@ -26,6 +26,7 @@ export interface ElementConfig {
     variant?: string;
     gravity?: boolean;
     speed?: number;
+    win?: boolean;
   };
 }
 
