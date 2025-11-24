@@ -375,8 +375,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     attributes: { gravity: false, speed: 8 },
     renderSVG: () => <></>,
     renderPixi: (g, _l, x, y, w, h) => {
-        g.circle(x + w/2, y + h/2, w/4).fill(0xFF4400);
-        g.circle(x + w/2, y + h/2, w/6).fill(0xFFFF00);
+        g.circle(x + w/2, y + h/2, w/2).fill(0xFF4400);
+        g.circle(x + w/2, y + h/2, w/4).fill(0xFFFF00);
     }
   },
   {

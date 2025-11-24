@@ -13,6 +13,12 @@ export const PLAYER_CONFIG = {
         bulletSpeed: 8,
     },
 
+    // Projectile Settings
+    projectile: {
+        width: 14,
+        height: 14
+    },
+
     // Form: Small Mario
     small: {
         width: TILE_SIZE * 0.8,

@@ -526,10 +526,10 @@ export const Game: React.FC = () => {
       entitiesRef.current.push({
           id: `bullet-${Date.now()}`,
           type: 'Bullet',
-          x: dir > 0 ? player.x + player.w : player.x - 8,
+          x: dir > 0 ? player.x + player.w : player.x - PLAYER_CONFIG.projectile.width,
           y: player.y + player.h * 0.5,
-          w: 8,
-          h: 8,
+          w: PLAYER_CONFIG.projectile.width,
+          h: PLAYER_CONFIG.projectile.height,
           vx: dir * PLAYER_CONFIG.physics.bulletSpeed,
           vy: 0,
           isDead: false,
