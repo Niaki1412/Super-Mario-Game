@@ -3,6 +3,8 @@ import { GameMap } from '../../types';
 
 interface PropertiesPanelProps {
   mapData: GameMap;
+  mapName: string;
+  onMapNameChange: (name: string) => void;
   onUpdateMap: (newData: Partial<GameMap>) => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -10,6 +12,8 @@ interface PropertiesPanelProps {
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
   mapData, 
+  mapName,
+  onMapNameChange,
   onUpdateMap, 
   onExport,
   onImport 
@@ -27,6 +31,24 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   return (
     <div className="flex flex-col h-full bg-gray-900 border-l border-gray-700 p-4 w-72 shadow-xl z-10 overflow-y-auto">
       <h2 className="text-lg font-bold text-white mb-6">⚙️ Properties</h2>
+
+      {/* Map Settings */}
+      <div className="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-300 mb-3">Map Settings</h3>
+        
+        <div className="space-y-4">
+           <div>
+            <label className="block text-xs text-gray-400 mb-1">Map Name (Filename)</label>
+            <input 
+              type="text" 
+              value={mapName}
+              onChange={(e) => onMapNameChange(e.target.value)}
+              placeholder="mario_map"
+              className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Map Dimensions */}
       <div className="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">

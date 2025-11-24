@@ -12,6 +12,7 @@ export const Editor: React.FC = () => {
 
   // --- State ---
   const [selectedElementId, setSelectedElementId] = useState<number | string | null>(1); // Default to Ground
+  const [mapName, setMapName] = useState("my_mario_map");
   const [mapData, setMapData] = useState<GameMap>({
     width: DEFAULT_MAP_WIDTH,
     height: DEFAULT_MAP_HEIGHT,
@@ -103,7 +104,11 @@ export const Editor: React.FC = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mapData, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "mario_map.json");
+    
+    // Ensure filename ends in .json
+    const fileName = mapName.trim() ? (mapName.endsWith('.json') ? mapName : `${mapName}.json`) : 'mario_map.json';
+    
+    downloadAnchorNode.setAttribute("download", fileName);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -119,6 +124,9 @@ export const Editor: React.FC = () => {
         const json = JSON.parse(event.target?.result as string);
         // Basic validation could go here
         setMapData(json);
+        // Optionally set the map name from the file name
+        const nameWithoutExt = file.name.replace(/\.json$/i, "");
+        setMapName(nameWithoutExt);
       } catch (err) {
         alert("Invalid JSON file");
       }
@@ -153,6 +161,8 @@ export const Editor: React.FC = () => {
       {/* Right: Properties */}
       <PropertiesPanel 
         mapData={mapData}
+        mapName={mapName}
+        onMapNameChange={setMapName}
         onUpdateMap={handleUpdateMap}
         onExport={handleExport}
         onImport={handleImport}
