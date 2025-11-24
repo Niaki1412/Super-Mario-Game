@@ -8,7 +8,7 @@ import { GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 interface MapCanvasProps {
   mapData: GameMap;
   selectedElementId: number | string | null;
-  onTileClick: (x: number, y: number, isRightClick: boolean) => void;
+  onTileClick: (x: number, y: number, isRightClick: boolean, isDrag: boolean) => void;
   onObjectClick: (objIndex: number) => void;
 }
 
@@ -111,7 +111,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             lastGridPosRef.current = { x, y };
 
             const isRightClick = e.button === 2;
-            onTileClickRef.current(x, y, isRightClick);
+            // Pass isDrag = false for initial click
+            onTileClickRef.current(x, y, isRightClick, false);
         };
 
         const onPointerMove = (e: PIXI.FederatedPointerEvent) => {
@@ -128,7 +129,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
             // Determine if right click is held (bitmask 2)
             const isRightClick = (e.buttons & 2) === 2; 
-            onTileClickRef.current(x, y, isRightClick);
+            // Pass isDrag = true for move events
+            onTileClickRef.current(x, y, isRightClick, true);
         };
 
         const onPointerUp = () => {
@@ -285,7 +287,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   return (
-    // Changed justify-center/items-center to m-auto logic to allow scrolling to (0,0) when overflowing
     <div 
       className="flex-1 bg-gray-950 overflow-auto relative flex"
       id="editor-canvas-container"

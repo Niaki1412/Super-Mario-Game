@@ -82,7 +82,7 @@ export const Editor: React.FC = () => {
     });
   };
 
-  const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean) => {
+  const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean, isDrag: boolean) => {
     if (x < 0 || y < 0 || x >= mapData.width || y >= mapData.height) return;
 
     // Erase Logic: Triggered by Right Click OR Eraser Tool
@@ -129,6 +129,10 @@ export const Editor: React.FC = () => {
 
       // Handle Text Element
       if (element.name === 'Text Decoration') {
+          // IMPORTANT: Do not trigger text prompt on drag. 
+          // Users must click explicitly to add text to avoid accidental prompts.
+          if (isDrag) return;
+
           const input = prompt("Enter a single character:", "A");
           if (!input) return; // Cancelled
           textContent = input.substring(0, 1);
