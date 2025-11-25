@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AssetPalette } from './AssetPalette';
 import { PropertiesPanel } from './PropertiesPanel';
 import { MapCanvas } from './MapCanvas';
+import { Game } from '../Game/Game';
 import { GameMap, GameObjectData } from '../../types';
 import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, TOOL_ERASER } from '../../constants';
 import { getElementById } from '../../elementRegistry';
@@ -17,6 +18,7 @@ export const Editor: React.FC = () => {
   const [selectedElementId, setSelectedElementId] = useState<number | string | null>(1); // Default to Ground
   const [mapName, setMapName] = useState("my_mario_map");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isPlayTesting, setIsPlayTesting] = useState(false);
   const [mapData, setMapData] = useState<GameMap>({
     width: DEFAULT_MAP_WIDTH,
     height: DEFAULT_MAP_HEIGHT,
@@ -59,6 +61,11 @@ export const Editor: React.FC = () => {
     } catch (e) {
       alert("Failed to save to local storage (quota might be full).");
     }
+  };
+
+  const handlePlayTest = () => {
+      handleSaveToStorage(); // Auto-save before playing
+      setIsPlayTesting(true);
   };
 
   // Update map properties (width/height) while preserving data
@@ -195,7 +202,7 @@ export const Editor: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-gray-950 text-white font-sans">
+    <div className="flex h-screen w-screen bg-gray-950 text-white font-sans relative">
       {/* Left: Palette */}
       <AssetPalette 
         selectedId={selectedElementId} 
@@ -228,7 +235,23 @@ export const Editor: React.FC = () => {
         onExport={handleExport}
         onImport={handleImport}
         onSave={handleSaveToStorage}
+        onPlayTest={handlePlayTest}
       />
+
+      {/* Play Test Modal */}
+      {isPlayTesting && (
+          <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-8 backdrop-blur-sm">
+              <div className="relative bg-black border-4 border-gray-700 rounded-lg shadow-2xl overflow-hidden" style={{ width: '800px', height: '600px' }}>
+                  <Game 
+                      initialMapData={mapData} 
+                      width={800} 
+                      height={600} 
+                      embedded={true}
+                      onClose={() => setIsPlayTesting(false)}
+                  />
+              </div>
+          </div>
+      )}
     </div>
   );
 };

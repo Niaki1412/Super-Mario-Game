@@ -17,13 +17,27 @@ const DEFAULT_CONTROLS = {
     doubleJump: ' '
 };
 
-export const Game: React.FC = () => {
+interface GameProps {
+    initialMapData?: GameMap;
+    width?: number;
+    height?: number;
+    onClose?: () => void;
+    embedded?: boolean;
+}
+
+export const Game: React.FC<GameProps> = ({ 
+    initialMapData, 
+    width, 
+    height, 
+    onClose,
+    embedded = false 
+}) => {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   
   // Game State Refs (for Loop)
-  const mapRef = useRef<GameMap | null>(null);
+  const mapRef = useRef<GameMap | null>(initialMapData || null);
   const entitiesRef = useRef<Entity[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const keysRef = useRef<Record<string, boolean>>({});
@@ -37,7 +51,7 @@ export const Game: React.FC = () => {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [gameWon, setGameWon] = useState(false);
-  const [currentMap, setCurrentMap] = useState<GameMap | null>(null);
+  const [currentMap, setCurrentMap] = useState<GameMap | null>(initialMapData || null);
   
   // Controls State
   const [controls, setControls] = useState(DEFAULT_CONTROLS);
@@ -98,14 +112,27 @@ export const Game: React.FC = () => {
     
     const initGame = async () => {
         app = new PIXI.Application();
-        // Full screen canvas
-        await app.init({
-            resizeTo: window,
+        
+        // Use props dimensions if embedded, otherwise full window
+        const initOptions: Partial<PIXI.ApplicationOptions> = {
             backgroundColor: currentMap.backgroundColor || '#5C94FC',
             preference: 'webgl'
-        });
+        };
+
+        if (embedded && width && height) {
+            initOptions.width = width;
+            initOptions.height = height;
+        } else {
+            initOptions.resizeTo = window;
+        }
+
+        await app.init(initOptions);
 
         if (containerRef.current) {
+            // Clear previous canvas if any
+            while (containerRef.current.firstChild) {
+                containerRef.current.removeChild(containerRef.current.firstChild);
+            }
             containerRef.current.appendChild(app.canvas);
         }
         appRef.current = app;
@@ -231,7 +258,7 @@ export const Game: React.FC = () => {
         }
         audioManager.stopBGM();
     };
-  }, [currentMap]);
+  }, [currentMap, width, height, embedded]);
 
 
   // --- PHYSICS ENGINE ---
@@ -887,18 +914,30 @@ export const Game: React.FC = () => {
           child.destroy({ texture: true, children: true });
       }
 
-      const player = entitiesRef.current.find(e => e.isPlayer);
+      // Camera Follow
       let cameraX = 0;
-      if (player) {
-          cameraX = Math.max(0, player.x - window.innerWidth / 2);
-          const maxCam = (mapRef.current!.width * TILE_SIZE) - window.innerWidth;
-          if (cameraX > maxCam) cameraX = Math.max(0, maxCam);
+      if (!embedded) {
+          const player = entitiesRef.current.find(e => e.isPlayer);
+          if (player) {
+              cameraX = Math.max(0, player.x - window.innerWidth / 2);
+              const maxCam = (mapRef.current!.width * TILE_SIZE) - window.innerWidth;
+              if (cameraX > maxCam) cameraX = Math.max(0, maxCam);
+          }
+      } else if (width) {
+          // Centered camera for embedded if map allows, or simple scrolling
+          const player = entitiesRef.current.find(e => e.isPlayer);
+          if (player) {
+              cameraX = Math.max(0, player.x - width / 2);
+              const maxCam = (mapRef.current!.width * TILE_SIZE) - width;
+              if (cameraX > maxCam) cameraX = Math.max(0, maxCam);
+          }
       }
       
       app.stage.position.x = -cameraX;
 
+      const viewW = width || window.innerWidth;
       const startCol = Math.floor(cameraX / TILE_SIZE);
-      const endCol = startCol + Math.ceil(window.innerWidth / TILE_SIZE) + 1;
+      const endCol = startCol + Math.ceil(viewW / TILE_SIZE) + 1;
 
       mapRef.current!.tiles.forEach((row, y) => {
           for(let x = startCol; x <= endCol; x++) {
@@ -983,9 +1022,17 @@ export const Game: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const handleExit = () => {
+      if (onClose) {
+          onClose();
+      } else {
+          navigate('/');
+      }
+  };
+
   if (!currentMap) {
       return (
-          <div className="h-screen bg-gray-900 flex flex-col items-center justify-center text-white p-8">
+          <div className="h-full w-full bg-gray-900 flex flex-col items-center justify-center text-white p-8">
               <h2 className="text-3xl font-bold mb-6">Load a Map to Play</h2>
               
               <label className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded cursor-pointer transition-colors shadow-lg mb-12">
@@ -1019,7 +1066,7 @@ export const Game: React.FC = () => {
                   <p className="text-center text-xs text-gray-500 mt-4">Click a button to rebind.</p>
               </div>
 
-              <button onClick={() => navigate('/')} className="mt-8 text-gray-400 hover:text-white underline">
+              <button onClick={handleExit} className="mt-8 text-gray-400 hover:text-white underline">
                   Back to Menu
               </button>
           </div>
@@ -1027,16 +1074,18 @@ export const Game: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="h-screen w-screen overflow-hidden relative">
+    <div ref={containerRef} className={`${embedded ? 'w-full h-full' : 'h-screen w-screen'} overflow-hidden relative`}>
         <div className="absolute top-4 left-4 text-white font-mono text-xl font-bold drop-shadow-md z-10 select-none">
             SCORE: {score}
         </div>
-        <div className="absolute top-10 left-4 text-white font-mono text-xs opacity-70 drop-shadow-md z-10 select-none">
-            CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} Move, {getKeyDisplay(controls.down)} Crouch, {getKeyDisplay(controls.jump)} Jump, {getKeyDisplay(controls.doubleJump)} Double Jump
-        </div>
+        {!embedded && (
+            <div className="absolute top-10 left-4 text-white font-mono text-xs opacity-70 drop-shadow-md z-10 select-none">
+                CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} Move, {getKeyDisplay(controls.down)} Crouch, {getKeyDisplay(controls.jump)} Jump, {getKeyDisplay(controls.doubleJump)} Double Jump
+            </div>
+        )}
 
         <button 
-            onClick={() => navigate('/')}
+            onClick={handleExit}
             className="absolute top-4 right-4 bg-gray-800/50 hover:bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 z-10 backdrop-blur-sm"
         >
             EXIT GAME
@@ -1054,7 +1103,7 @@ export const Game: React.FC = () => {
                         Try Again
                     </button>
                     <button 
-                        onClick={() => navigate('/')}
+                        onClick={handleExit}
                         className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded shadow-lg"
                     >
                         Quit
@@ -1069,7 +1118,7 @@ export const Game: React.FC = () => {
                 <p className="text-white text-2xl font-bold mb-8 drop-shadow">Score: {score}</p>
                 <div className="flex gap-4">
                     <button 
-                        onClick={() => navigate('/')}
+                        onClick={handleExit}
                         className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all"
                     >
                         Return to Menu

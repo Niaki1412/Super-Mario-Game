@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { GameMap } from '../../types';
-import { Save } from 'lucide-react';
+import { Save, Play } from 'lucide-react';
 
 interface PropertiesPanelProps {
   mapData: GameMap;
@@ -11,6 +12,7 @@ interface PropertiesPanelProps {
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSave: () => void;
+  onPlayTest: () => void;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
@@ -21,7 +23,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onUpdateMap, 
   onExport,
   onImport,
-  onSave
+  onSave,
+  onPlayTest
 }) => {
   
   const handleDimensionChange = (key: 'width' | 'height', value: string) => {
@@ -114,6 +117,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                  Last saved: {lastSaved.toLocaleTimeString()}
              </div>
          )}
+
+         <button 
+            onClick={onPlayTest}
+            className="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-4 rounded shadow transition-colors flex justify-center items-center gap-2 mb-2"
+         >
+             <Play size={16} fill="currentColor" />
+             <span>Play Test</span>
+         </button>
 
          <button 
             onClick={onSave}
