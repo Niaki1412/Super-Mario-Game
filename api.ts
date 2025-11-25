@@ -24,21 +24,33 @@ export interface UserOut {
 }
 
 // Map Interfaces
+
 export interface MapIn {
   id?: number | null;
   map_data: string; // JSON string of GameMap
   is_public?: boolean;
 }
 
-export interface MapOut {
+// Response from /api/my_maps
+export interface MapListItem {
   id: number;
-  user_id: number;
-  map_data: string; // JSON string
-  is_public: boolean;
   status: number;
-  create_at: string;
-  update_at: string;
+  user_id: number;
 }
+
+// Response from /api/map/<id>
+export interface MapDetail {
+  id: number;
+  map_data: string; // JSON string
+  user_id?: number;
+  is_public?: boolean;
+  status?: number;
+  create_at?: string;
+  update_at?: string;
+}
+
+// Keeping legacy MapOut for compatibility if needed, but aligned with Detail
+export type MapOut = MapDetail;
 
 export interface DeleteIn {
   map_id: number;
@@ -108,23 +120,36 @@ export const getUserProfile = async (token: string): Promise<UserOut[]> => {
 
 // --- Map Endpoints ---
 
-export const saveMap = async (data: MapIn, token: string): Promise<MapOut> => {
+export const saveMap = async (data: MapIn, token: string): Promise<MapDetail> => {
    const res = await fetch(`${API_BASE}/map/save`, {
      method: 'POST',
      headers: getHeaders(token),
      body: JSON.stringify(data)
    });
    if (!res.ok) throw new Error('Failed to save map');
-   return res.json();
+   const json = await res.json();
+   return json.data || json; 
 };
 
-export const getMyMaps = async (token: string): Promise<MapOut[]> => {
+export const getMyMaps = async (token: string): Promise<MapListItem[]> => {
    const res = await fetch(`${API_BASE}/my_maps`, {
      method: 'GET',
      headers: getHeaders(token)
    });
    if (!res.ok) throw new Error('Failed to fetch maps');
-   return res.json();
+   const json = await res.json();
+   // Expecting structure { data: [...], ... }
+   return json.data; 
+};
+
+export const getMapById = async (id: number, token: string): Promise<MapDetail> => {
+    const res = await fetch(`${API_BASE}/map/${id}`, {
+        method: 'GET',
+        headers: getHeaders(token)
+    });
+    if (!res.ok) throw new Error('Failed to fetch map');
+    const json = await res.json();
+    return json.data;
 };
 
 export const deleteMap = async (data: DeleteIn, token: string): Promise<void> => {

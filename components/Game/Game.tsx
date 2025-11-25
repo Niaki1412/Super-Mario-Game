@@ -6,6 +6,8 @@ import { GameMap, Entity, Particle } from '../../types';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
+import { getMyMaps, getMapById, MapListItem } from '../../api';
+import { Cloud, CheckCircle } from 'lucide-react';
 
 const DEFAULT_CONTROLS = {
     left: 'a',
@@ -56,6 +58,10 @@ export const Game: React.FC<GameProps> = ({
   const [controls, setControls] = useState(DEFAULT_CONTROLS);
   const [bindingAction, setBindingAction] = useState<keyof typeof DEFAULT_CONTROLS | null>(null);
 
+  // Map List State
+  const [myMaps, setMyMaps] = useState<MapListItem[]>([]);
+  const [isLoadingMaps, setIsLoadingMaps] = useState(false);
+
   // --- HELPERS ---
 
   const checkRectCollision = (r1: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}) => {
@@ -95,6 +101,20 @@ export const Game: React.FC<GameProps> = ({
         try { setControls({ ...DEFAULT_CONTROLS, ...JSON.parse(saved) }); } catch(e) {}
     }
   }, []);
+
+  // --- FETCH MAP LIST ---
+  useEffect(() => {
+      if (!currentMap && !embedded) {
+          const token = localStorage.getItem('access_token');
+          if (token) {
+              setIsLoadingMaps(true);
+              getMyMaps(token)
+                .then(setMyMaps)
+                .catch(err => console.error("Failed to load maps", err))
+                .finally(() => setIsLoadingMaps(false));
+          }
+      }
+  }, [currentMap, embedded]);
 
   const getKeyDisplay = (key: string) => {
       if (key === ' ') return 'SPACE';
@@ -1048,6 +1068,32 @@ export const Game: React.FC<GameProps> = ({
     reader.readAsText(file);
   };
 
+  const handleLoadFromApi = async (id: number) => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+          alert("Please login to play cloud maps");
+          return;
+      }
+      try {
+          const mapData = await getMapById(id, token);
+          if (mapData.map_data) {
+              // Ensure we parse the string back to JSON
+              let json;
+              if (typeof mapData.map_data === 'string') {
+                  json = JSON.parse(mapData.map_data);
+              } else {
+                  json = mapData.map_data;
+              }
+              setCurrentMap(json);
+          } else {
+              alert("Map data is empty");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("Failed to load map from cloud");
+      }
+  };
+
   const handleExit = () => {
       if (onClose) {
           onClose();
@@ -1058,13 +1104,52 @@ export const Game: React.FC<GameProps> = ({
 
   if (!currentMap) {
       return (
-          <div className="h-full w-full bg-gray-900 flex flex-col items-center justify-center text-white p-8">
+          <div className="h-full w-full bg-gray-900 flex flex-col items-center justify-center text-white p-8 overflow-y-auto">
               <h2 className="text-3xl font-bold mb-6">Load a Map to Play</h2>
               
-              <label className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded cursor-pointer transition-colors shadow-lg mb-12">
-                  Select JSON Map File
-                  <input type="file" accept=".json" onChange={handleImportMap} className="hidden" />
-              </label>
+              <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                  {/* LOCAL LOAD */}
+                  <div className="flex flex-col items-center p-6 bg-gray-800 rounded-lg border border-gray-700">
+                      <h3 className="text-xl font-bold mb-4 text-gray-300">Local File</h3>
+                      <label className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded cursor-pointer transition-colors shadow-lg">
+                          Select JSON Map
+                          <input type="file" accept=".json" onChange={handleImportMap} className="hidden" />
+                      </label>
+                  </div>
+
+                  {/* CLOUD LOAD */}
+                  <div className="flex flex-col items-center p-6 bg-gray-800 rounded-lg border border-gray-700 max-h-[400px]">
+                       <h3 className="text-xl font-bold mb-4 text-gray-300 flex items-center gap-2">
+                           <Cloud size={24} /> My Cloud Maps
+                       </h3>
+                       
+                       {isLoadingMaps ? (
+                           <div className="text-gray-400">Loading maps...</div>
+                       ) : myMaps.length > 0 ? (
+                           <div className="w-full grid grid-cols-1 gap-2 overflow-y-auto pr-2">
+                               {myMaps.map((map) => (
+                                   <button 
+                                      key={map.id}
+                                      onClick={() => handleLoadFromApi(map.id)}
+                                      className="group bg-gray-700 hover:bg-gray-600 p-3 rounded flex items-center justify-between border border-gray-600 hover:border-blue-500 transition-all"
+                                   >
+                                       <div className="flex flex-col items-start">
+                                           <span className="font-bold text-sm group-hover:text-blue-300">Map #{map.id}</span>
+                                           <span className="text-[10px] text-gray-400">Status: {map.status === 1 ? 'Active' : 'Draft'}</span>
+                                       </div>
+                                       <CheckCircle size={16} className="text-gray-500 group-hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                   </button>
+                               ))}
+                           </div>
+                       ) : (
+                           <div className="text-gray-500 text-sm">
+                               {localStorage.getItem('access_token') 
+                                ? "No maps found in cloud." 
+                                : "Login to access cloud maps."}
+                           </div>
+                       )}
+                  </div>
+              </div>
 
               {/* CONTROLS CONFIG UI */}
               <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 w-full max-w-lg">
