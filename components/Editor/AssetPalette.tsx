@@ -1,22 +1,19 @@
+
 import React from 'react';
 import { TOOL_ERASER } from '../../constants';
 import { GAME_ELEMENTS_REGISTRY, RegistryItem } from '../../elementRegistry';
-import { Trash2, Eraser, Palette } from 'lucide-react';
+import { Trash2, Eraser } from 'lucide-react';
 
 interface AssetPaletteProps {
   selectedId: number | string | null;
   onSelect: (id: number | string) => void;
   onClearMap: () => void;
-  backgroundColor: string;
-  onBackgroundColorChange: (color: string) => void;
 }
 
 export const AssetPalette: React.FC<AssetPaletteProps> = ({ 
     selectedId, 
     onSelect, 
-    onClearMap,
-    backgroundColor,
-    onBackgroundColorChange
+    onClearMap
 }) => {
   const categories = Array.from(new Set(GAME_ELEMENTS_REGISTRY.map(e => e.category)));
 
@@ -66,23 +63,6 @@ export const AssetPalette: React.FC<AssetPaletteProps> = ({
       </h2>
 
       <div className="space-y-2 mb-4">
-        {/* Background Color Picker */}
-        <div className="bg-gray-800 p-2 rounded border border-gray-700 mb-2">
-            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-wide">
-                <Palette size={12} />
-                Background Color
-            </label>
-            <div className="flex gap-2 items-center">
-                 <input
-                    type="color"
-                    value={backgroundColor || '#5C94FC'}
-                    onChange={(e) => onBackgroundColorChange(e.target.value)}
-                    className="h-8 w-12 bg-transparent cursor-pointer border-0 p-0 rounded overflow-hidden"
-                />
-                <span className="text-[10px] font-mono text-gray-500 uppercase">{backgroundColor}</span>
-            </div>
-        </div>
-
         <button 
             onClick={onClearMap}
             className="w-full flex items-center justify-center gap-2 bg-red-900/30 hover:bg-red-900/50 text-red-200 text-xs font-bold py-2 px-3 rounded border border-red-900/50 transition-colors"

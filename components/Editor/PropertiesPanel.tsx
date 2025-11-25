@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { GameMap } from '../../types';
-import { Save, Play } from 'lucide-react';
+import { Save, Play, ArrowUpFromLine, ArrowDownToLine, Palette } from 'lucide-react';
 
 interface PropertiesPanelProps {
   mapData: GameMap;
@@ -15,6 +15,7 @@ interface PropertiesPanelProps {
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSave: () => void;
   onPlayTest: () => void;
+  onBackgroundColorChange: (color: string) => void;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
@@ -28,10 +29,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onExport,
   onImport,
   onSave,
-  onPlayTest
+  onPlayTest,
+  onBackgroundColorChange
 }) => {
   
-  const handleDimensionChange = (key: 'width' | 'height', value: string) => {
+  const handleDimensionChange = (key: 'width' | 'height' | 'tileSize', value: string) => {
     const numValue = parseInt(value, 10);
     if (isNaN(numValue) || numValue < 1) return;
     onUpdateMap({ [key]: numValue });
@@ -95,11 +97,28 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <input 
               type="number" 
               value={mapData.tileSize}
-              disabled
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-500 cursor-not-allowed text-sm"
+              onChange={(e) => handleDimensionChange('tileSize', e.target.value)}
+              className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm"
             />
           </div>
         </div>
+      </div>
+
+      {/* Background Color */}
+      <div className="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
+          <label className="flex items-center gap-2 text-xs font-semibold text-gray-300 mb-2">
+                <Palette size={14} />
+                Background Color
+          </label>
+          <div className="flex gap-2 items-center bg-gray-900 p-2 rounded border border-gray-600">
+                <input
+                    type="color"
+                    value={mapData.backgroundColor || '#5C94FC'}
+                    onChange={(e) => onBackgroundColorChange(e.target.value)}
+                    className="h-6 w-8 bg-transparent cursor-pointer border-0 p-0 rounded overflow-hidden"
+                />
+                <span className="text-xs font-mono text-gray-400 uppercase">{mapData.backgroundColor}</span>
+          </div>
       </div>
 
       {/* Stats */}
@@ -162,24 +181,34 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <span>Save to Browser</span>
          </button>
 
-         <div className="relative">
-             <input
-                type="file"
-                accept=".json"
-                onChange={onImport}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-             />
-             <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded border border-gray-600 transition-colors text-sm">
-                Import JSON
-             </button>
+         {/* Import / Export Circular Buttons */}
+         <div className="flex gap-4 justify-center items-center pt-2">
+             <div className="relative group flex flex-col items-center gap-1">
+                 <input
+                    type="file"
+                    accept=".json"
+                    onChange={onImport}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    title="Import JSON"
+                 />
+                 <button className="w-12 h-12 bg-gray-700 hover:bg-gray-600 text-white rounded-full border border-gray-600 transition-all flex items-center justify-center shadow-lg group-hover:scale-110">
+                    <ArrowUpFromLine size={20} />
+                 </button>
+                 <span className="text-[10px] text-gray-500 font-bold">IMPORT</span>
+             </div>
+
+            <div className="flex flex-col items-center gap-1">
+                <button 
+                  onClick={onExport}
+                  title="Export JSON"
+                  className="w-12 h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-lg transition-all flex items-center justify-center hover:scale-110"
+                >
+                  <ArrowDownToLine size={20} />
+                </button>
+                <span className="text-[10px] text-gray-500 font-bold">EXPORT</span>
+            </div>
          </div>
 
-        <button 
-          onClick={onExport}
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded shadow-lg transition-colors flex justify-center items-center gap-2 text-sm"
-        >
-          <span>Export JSON</span>
-        </button>
       </div>
     </div>
   );

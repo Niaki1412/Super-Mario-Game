@@ -2,7 +2,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as PIXI from 'pixi.js';
 import { GameMap } from '../../types';
-import { TILE_SIZE, TOOL_ERASER } from '../../constants';
+import { TOOL_ERASER } from '../../constants';
 import { GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 
 interface MapCanvasProps {
@@ -58,12 +58,15 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   useEffect(() => {
     let isMounted = true;
     let app: PIXI.Application | null = null;
+    
+    // Dynamic tile size
+    const tileSize = mapData.tileSize;
 
     const initPixi = async () => {
         app = new PIXI.Application();
         
-        const totalWidth = mapData.width * TILE_SIZE + RULER_OFFSET;
-        const totalHeight = mapData.height * TILE_SIZE + RULER_OFFSET;
+        const totalWidth = mapData.width * tileSize + RULER_OFFSET;
+        const totalHeight = mapData.height * tileSize + RULER_OFFSET;
 
         try {
           await app.init({
@@ -122,8 +125,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const getGridPos = (e: PIXI.FederatedPointerEvent) => {
             const adjX = e.global.x - RULER_OFFSET;
             const adjY = e.global.y - RULER_OFFSET;
-            const x = Math.floor(adjX / TILE_SIZE);
-            const y = Math.floor(adjY / TILE_SIZE);
+            // Use current map data directly here if possible, or ref
+            const currentTS = mapDataRef.current.tileSize;
+            const x = Math.floor(adjX / currentTS);
+            const y = Math.floor(adjY / currentTS);
             return { x, y };
         };
 
@@ -203,15 +208,16 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   useEffect(() => {
     if (appRef.current && isAppReady) {
         const app = appRef.current;
-        const newWidth = mapData.width * TILE_SIZE + RULER_OFFSET;
-        const newHeight = mapData.height * TILE_SIZE + RULER_OFFSET;
+        const tileSize = mapData.tileSize;
+        const newWidth = mapData.width * tileSize + RULER_OFFSET;
+        const newHeight = mapData.height * tileSize + RULER_OFFSET;
         
         if (app.renderer.width !== newWidth || app.renderer.height !== newHeight) {
             app.renderer.resize(newWidth, newHeight);
             app.stage.hitArea = new PIXI.Rectangle(0, 0, newWidth, newHeight);
         }
     }
-  }, [mapData.width, mapData.height, isAppReady]);
+  }, [mapData.width, mapData.height, mapData.tileSize, isAppReady]);
 
 
   // --- RENDERING LOGIC ---
@@ -241,6 +247,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       
       const g = staticGraphicsRef.current;
       const labels = staticLabelsRef.current;
+      const tileSize = mapData.tileSize;
       
       g.clear();
       
@@ -251,26 +258,27 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       }
 
       // --- Draw Ruler Background ---
-      g.rect(0, 0, mapData.width * TILE_SIZE + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a);
-      g.rect(0, 0, RULER_OFFSET, mapData.height * TILE_SIZE + RULER_OFFSET).fill(0x1a1a1a);
+      g.rect(0, 0, mapData.width * tileSize + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a);
+      g.rect(0, 0, RULER_OFFSET, mapData.height * tileSize + RULER_OFFSET).fill(0x1a1a1a);
       
       // --- Draw Grid & Labels ---
       // Vertical
       for (let x = 0; x <= mapData.width; x++) {
-        const xPos = x * TILE_SIZE + RULER_OFFSET;
+        const xPos = x * tileSize + RULER_OFFSET;
         g.moveTo(xPos, RULER_OFFSET);
-        g.lineTo(xPos, mapData.height * TILE_SIZE + RULER_OFFSET);
+        g.lineTo(xPos, mapData.height * tileSize + RULER_OFFSET);
         if (x < mapData.width) {
-            addLabel(labels, `${x}`, xPos + TILE_SIZE/2, RULER_OFFSET / 2);
+            // Draw coordinate every 1 or 5 steps depending on density? For now all
+            addLabel(labels, `${x}`, xPos + tileSize/2, RULER_OFFSET / 2);
         }
       }
       // Horizontal
       for (let y = 0; y <= mapData.height; y++) {
-        const yPos = y * TILE_SIZE + RULER_OFFSET;
+        const yPos = y * tileSize + RULER_OFFSET;
         g.moveTo(RULER_OFFSET, yPos);
-        g.lineTo(mapData.width * TILE_SIZE + RULER_OFFSET, yPos);
+        g.lineTo(mapData.width * tileSize + RULER_OFFSET, yPos);
         if (y < mapData.height) {
-            addLabel(labels, `${y}`, RULER_OFFSET / 2, yPos + TILE_SIZE/2);
+            addLabel(labels, `${y}`, RULER_OFFSET / 2, yPos + tileSize/2);
         }
       }
       g.stroke({ width: 1, color: 0x555555, alpha: 0.5 });
@@ -281,9 +289,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           if (tileId !== 0) {
             const config = GAME_ELEMENTS_REGISTRY.find(el => el.id === tileId);
             if (config) {
-              const drawX = x * TILE_SIZE + RULER_OFFSET;
-              const drawY = y * TILE_SIZE + RULER_OFFSET;
-              config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE);
+              const drawX = x * tileSize + RULER_OFFSET;
+              const drawY = y * tileSize + RULER_OFFSET;
+              config.renderPixi(g, labels, drawX, drawY, tileSize, tileSize);
             }
           }
         });
@@ -298,6 +306,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const g = dynamicGraphicsRef.current;
     const labels = dynamicLabelsRef.current;
     const currentMap = mapDataRef.current;
+    const tileSize = currentMap.tileSize;
 
     g.clear();
     
@@ -314,7 +323,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         if (config) {
             const drawX = obj.x + RULER_OFFSET;
             const drawY = obj.y + RULER_OFFSET;
-            config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE, obj);
+            // Ensure size matches map tile size
+            config.renderPixi(g, labels, drawX, drawY, tileSize, tileSize, obj);
         }
     });
   };
@@ -324,7 +334,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       if (isAppReady) {
           drawStatic();
       }
-  }, [mapData.tiles, mapData.width, mapData.height, isAppReady]);
+  }, [mapData.tiles, mapData.width, mapData.height, mapData.tileSize, isAppReady]);
 
 
   const getCursorStyle = () => {

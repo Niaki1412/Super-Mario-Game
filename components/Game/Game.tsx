@@ -3,7 +3,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle } from '../../types';
-import { TILE_SIZE } from '../../constants';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
@@ -69,8 +68,9 @@ export const Game: React.FC<GameProps> = ({
   };
 
   const getTileAt = (x: number, y: number, map: GameMap) => {
-    const tx = Math.floor(x / TILE_SIZE);
-    const ty = Math.floor(y / TILE_SIZE);
+    const tileSize = map.tileSize;
+    const tx = Math.floor(x / tileSize);
+    const ty = Math.floor(y / tileSize);
     
     if (ty < 0 || ty >= map.height || tx < 0 || tx >= map.width) return 0;
     return map.tiles[ty][tx];
@@ -164,6 +164,7 @@ export const Game: React.FC<GameProps> = ({
 
         // Parse Objects & Create Entities
         const newEntities: Entity[] = [];
+        const tileSize = currentMap.tileSize;
         
         // Find Player Start or default
         let startX = 100;
@@ -174,14 +175,18 @@ export const Game: React.FC<GameProps> = ({
             startY = playerStart.y;
         }
 
+        // Dynamic Player Sizing relative to tile size (scale logic)
+        // Assume constants.ts TILE_SIZE (32) was the base for config.
+        const scaleRatio = tileSize / 32;
+
         // Create Player
         newEntities.push({
             id: 'player',
             type: 'player',
             x: startX,
             y: startY,
-            w: PLAYER_CONFIG.small.width,
-            h: PLAYER_CONFIG.small.height,
+            w: PLAYER_CONFIG.small.width * scaleRatio,
+            h: PLAYER_CONFIG.small.height * scaleRatio,
             vx: 0,
             vy: 0,
             isDead: false,
@@ -202,12 +207,12 @@ export const Game: React.FC<GameProps> = ({
             const config = getElementByName(obj.type);
             if (!config) return;
 
-            let h = TILE_SIZE;
+            let h = tileSize;
             let y = obj.y;
             
             if (config.name === 'Flagpole') {
-                 h = TILE_SIZE * 9;
-                 y = obj.y - (h - TILE_SIZE);
+                 h = tileSize * 9;
+                 y = obj.y - (h - tileSize);
             }
 
             newEntities.push({
@@ -215,7 +220,7 @@ export const Game: React.FC<GameProps> = ({
                 type: obj.type,
                 x: obj.x,
                 y: y,
-                w: TILE_SIZE,
+                w: tileSize,
                 h: h,
                 vx: config.category === 'enemy' ? -1 : 0, 
                 vy: 0,
@@ -266,17 +271,18 @@ export const Game: React.FC<GameProps> = ({
   const updatePhysics = (delta: number) => {
       const map = mapRef.current!;
       const entities = entitiesRef.current;
-      // Snapshot keys for consistency in this frame
       const keys = { ...keysRef.current };
       const prevKeys = prevKeysRef.current;
+      const tileSize = map.tileSize;
       
       const phys = PLAYER_CONFIG.physics;
+      const scaleRatio = tileSize / 32; // Scale physics forces if needed or keep uniform
 
       // Filter entities
       entitiesRef.current = entities.filter(e => {
           if (e.isDead && !e.isPlayer) return false;
           if (e.isEffect && e.vy > 5) return false; 
-          if (e.isBullet && (e.x < 0 || e.x > map.width * TILE_SIZE)) return false;
+          if (e.isBullet && (e.x < 0 || e.x > map.width * tileSize)) return false;
           return true;
       });
       
@@ -350,7 +356,7 @@ export const Game: React.FC<GameProps> = ({
                   if (!entity.isCrouching) {
                       entity.isCrouching = true;
                       // Reduce height
-                      const originalH = entity.isBig ? PLAYER_CONFIG.big.height : PLAYER_CONFIG.small.height;
+                      const originalH = (entity.isBig ? PLAYER_CONFIG.big.height : PLAYER_CONFIG.small.height) * scaleRatio;
                       entity.h = originalH * 0.6; 
                       entity.y += (originalH - entity.h); // Push down to align feet
                   }
@@ -358,7 +364,7 @@ export const Game: React.FC<GameProps> = ({
                   if (entity.isCrouching) {
                        // Stand up
                        entity.isCrouching = false;
-                       const targetH = entity.isBig ? PLAYER_CONFIG.big.height : PLAYER_CONFIG.small.height;
+                       const targetH = (entity.isBig ? PLAYER_CONFIG.big.height : PLAYER_CONFIG.small.height) * scaleRatio;
                        entity.y -= (targetH - entity.h); // Push up
                        entity.h = targetH;
                   }
@@ -378,20 +384,19 @@ export const Game: React.FC<GameProps> = ({
                   entity.jumpCount = 0; // Reset jumps
                   if (jumpRequested) {
                       const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
-                      entity.vy = force;
+                      entity.vy = force; // Physics don't strictly need scaling if gravity/speed is abstract
                       entity.grounded = false;
                       entity.jumpCount = 1;
                       audioManager.playJump();
                   }
               } else {
                   // Air Logic / Double Jump
-                  // Allow double jump if we haven't used it (jumpCount < 2) and jump key is pressed fresh
                   if (jumpRequested && (entity.jumpCount || 0) < 2) {
                       const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
-                      entity.vy = force * 0.9; // Slightly weaker double jump?
+                      entity.vy = force * 0.9; 
                       entity.jumpCount = (entity.jumpCount || 0) + 1;
                       audioManager.playJump();
-                      spawnParticles(entity.x, entity.y + entity.h, 0xFFFFFF); // Cloud effect
+                      spawnParticles(entity.x, entity.y + entity.h, 0xFFFFFF); 
                   }
               }
               
@@ -417,7 +422,7 @@ export const Game: React.FC<GameProps> = ({
               if (entity.vx < -phys.runSpeed) entity.vx = -phys.runSpeed;
 
               // Death fall
-              if (entity.y > map.height * TILE_SIZE) {
+              if (entity.y > map.height * tileSize) {
                   die();
               }
           }
@@ -429,7 +434,7 @@ export const Game: React.FC<GameProps> = ({
                    entity.vy = 0; 
                    
                    entity.plantTimer = (entity.plantTimer || 0) + delta;
-                   const MAX_HEIGHT = -TILE_SIZE * 0.8;
+                   const MAX_HEIGHT = -tileSize * 0.8;
                    const MOVE_SPEED = 0.5;
 
                    if (entity.plantState === 'hidden') {
@@ -463,7 +468,6 @@ export const Game: React.FC<GameProps> = ({
                    entity.vy = 0;
                    entity.spikeTimer = (entity.spikeTimer || 0) + delta;
                    
-                   // Cycle: Hidden (120) -> Warning (30) -> Active (60)
                    if (entity.spikeState === 'hidden') {
                        if (entity.spikeTimer > 120) {
                            entity.spikeState = 'warning';
@@ -620,15 +624,19 @@ export const Game: React.FC<GameProps> = ({
                           if (config?.attributes?.variant === 'grow') {
                               if (!entity.isBig) {
                                   entity.isBig = true;
-                                  entity.h = PLAYER_CONFIG.big.height;
-                                  entity.y -= (PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height);
+                                  const targetH = (PLAYER_CONFIG.big.height) * scaleRatio;
+                                  const prevH = entity.h;
+                                  entity.h = targetH;
+                                  entity.y -= (targetH - prevH);
                               }
                               audioManager.playPowerup();
                           } else if (config?.attributes?.variant === 'fire') {
                               if (!entity.isBig) {
                                   entity.isBig = true;
-                                  entity.h = PLAYER_CONFIG.big.height;
-                                  entity.y -= (PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height);
+                                  const targetH = (PLAYER_CONFIG.big.height) * scaleRatio;
+                                  const prevH = entity.h;
+                                  entity.h = targetH;
+                                  entity.y -= (targetH - prevH);
                               }
                               entity.canShoot = true;
                               audioManager.playPowerup();
@@ -688,12 +696,18 @@ export const Game: React.FC<GameProps> = ({
 
   const takeDamage = (entity: Entity) => {
       if (entity.invincibleTimer && entity.invincibleTimer > 0) return;
-      
+      const tileSize = mapRef.current!.tileSize;
+      const scaleRatio = tileSize / 32;
+
       if (entity.isBig) {
           entity.isBig = false;
           entity.canShoot = false; 
-          entity.h = PLAYER_CONFIG.small.height;
-          entity.y += PLAYER_CONFIG.big.height - PLAYER_CONFIG.small.height; 
+          
+          const targetH = PLAYER_CONFIG.small.height * scaleRatio;
+          const prevH = entity.h;
+          entity.h = targetH;
+          entity.y += (prevH - targetH); 
+          
           audioManager.playBump(); 
           entity.invincibleTimer = 1.0; 
       } else {
@@ -702,14 +716,15 @@ export const Game: React.FC<GameProps> = ({
   };
 
   const handleTileCollision = (entity: Entity, map: GameMap, axis: 'x' | 'y') => {
-      const startX = Math.floor(entity.x / TILE_SIZE);
-      const endX = Math.floor((entity.x + entity.w - 0.01) / TILE_SIZE);
-      const startY = Math.floor(entity.y / TILE_SIZE);
-      const endY = Math.floor((entity.y + entity.h - 0.01) / TILE_SIZE);
+      const tileSize = map.tileSize;
+      const startX = Math.floor(entity.x / tileSize);
+      const endX = Math.floor((entity.x + entity.w - 0.01) / tileSize);
+      const startY = Math.floor(entity.y / tileSize);
+      const endY = Math.floor((entity.y + entity.h - 0.01) / tileSize);
 
       for (let y = startY; y <= endY; y++) {
           for (let x = startX; x <= endX; x++) {
-              const tileId = getTileAt(x * TILE_SIZE, y * TILE_SIZE, map);
+              const tileId = getTileAt(x * tileSize, y * tileSize, map);
               
               if (isLethalTile(tileId) && entity.isPlayer) {
                   die();
@@ -717,7 +732,7 @@ export const Game: React.FC<GameProps> = ({
               }
 
               if (isSolid(tileId)) {
-                  const tileRect = { x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE };
+                  const tileRect = { x: x * tileSize, y: y * tileSize, w: tileSize, h: tileSize };
                   
                   if (axis === 'x') {
                       if (entity.vx > 0) {
@@ -761,9 +776,9 @@ export const Game: React.FC<GameProps> = ({
                                   id: `coin-fx-${Date.now()}`,
                                   type: 'Coin',
                                   x: tileRect.x,
-                                  y: tileRect.y - TILE_SIZE, 
-                                  w: TILE_SIZE,
-                                  h: TILE_SIZE,
+                                  y: tileRect.y - tileSize, 
+                                  w: tileSize,
+                                  h: tileSize,
                                   vx: 0,
                                   vy: -8, 
                                   isDead: false,
@@ -810,10 +825,11 @@ export const Game: React.FC<GameProps> = ({
   };
 
   const spawnParticles = (x: number, y: number, color: number) => {
+      const tileSize = mapRef.current!.tileSize;
       for(let i=0; i<5; i++) {
           particlesRef.current.push({
-              x: x + TILE_SIZE/2,
-              y: y + TILE_SIZE/2,
+              x: x + tileSize/2,
+              y: y + tileSize/2,
               vx: (Math.random() - 0.5) * 5,
               vy: (Math.random() - 1) * 5,
               color: color,
@@ -836,7 +852,7 @@ export const Game: React.FC<GameProps> = ({
       const h = e.h;
       const isBig = e.isBig;
       const canShoot = e.canShoot;
-      const isCrouching = e.isCrouching;
+      // const isCrouching = e.isCrouching;
       
       const isRight = lastDirRef.current > 0;
       const colors = canShoot ? PLAYER_CONFIG.fireAppearance : PLAYER_CONFIG.appearance;
@@ -846,8 +862,6 @@ export const Game: React.FC<GameProps> = ({
       const isRunning = Math.abs(e.vx) > 0.1 && e.grounded;
       const tick = Date.now() / 150;
       const animOffset = isRunning ? Math.sin(tick) * (w * 0.15) : 0;
-      
-      // If Crouching, we squash visually vertically (already adjusted H, but let's draw compact)
       
       const legH = isBig ? h * 0.2 : h * 0.25;
       const bodyH = isBig ? h * 0.4 : h * 0.4;
@@ -904,6 +918,7 @@ export const Game: React.FC<GameProps> = ({
       const labels = app.stage.getChildByLabel('game-labels') as PIXI.Container;
       
       if (!g || !labels) return;
+      const tileSize = mapRef.current!.tileSize;
 
       g.clear();
       
@@ -920,7 +935,7 @@ export const Game: React.FC<GameProps> = ({
           const player = entitiesRef.current.find(e => e.isPlayer);
           if (player) {
               cameraX = Math.max(0, player.x - window.innerWidth / 2);
-              const maxCam = (mapRef.current!.width * TILE_SIZE) - window.innerWidth;
+              const maxCam = (mapRef.current!.width * tileSize) - window.innerWidth;
               if (cameraX > maxCam) cameraX = Math.max(0, maxCam);
           }
       } else if (width) {
@@ -928,7 +943,7 @@ export const Game: React.FC<GameProps> = ({
           const player = entitiesRef.current.find(e => e.isPlayer);
           if (player) {
               cameraX = Math.max(0, player.x - width / 2);
-              const maxCam = (mapRef.current!.width * TILE_SIZE) - width;
+              const maxCam = (mapRef.current!.width * tileSize) - width;
               if (cameraX > maxCam) cameraX = Math.max(0, maxCam);
           }
       }
@@ -936,8 +951,8 @@ export const Game: React.FC<GameProps> = ({
       app.stage.position.x = -cameraX;
 
       const viewW = width || window.innerWidth;
-      const startCol = Math.floor(cameraX / TILE_SIZE);
-      const endCol = startCol + Math.ceil(viewW / TILE_SIZE) + 1;
+      const startCol = Math.floor(cameraX / tileSize);
+      const endCol = startCol + Math.ceil(viewW / tileSize) + 1;
 
       mapRef.current!.tiles.forEach((row, y) => {
           for(let x = startCol; x <= endCol; x++) {
@@ -946,7 +961,7 @@ export const Game: React.FC<GameProps> = ({
               if (tileId !== 0) {
                   const config = GAME_ELEMENTS_REGISTRY.find(e => e.id === tileId);
                   if (config) {
-                      config.renderPixi(g, labels, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                      config.renderPixi(g, labels, x * tileSize, y * tileSize, tileSize, tileSize);
                   }
               }
           }

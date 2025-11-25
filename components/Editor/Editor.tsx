@@ -6,8 +6,9 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { MapCanvas } from './MapCanvas';
 import { Game } from '../Game/Game';
 import { GameMap, GameObjectData } from '../../types';
-import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE, TOOL_ERASER } from '../../constants';
+import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE as DEFAULT_TILE_SIZE, TOOL_ERASER } from '../../constants';
 import { getElementById } from '../../elementRegistry';
+import { X } from 'lucide-react';
 
 const STORAGE_KEY = 'MARIO_MAP_DATA';
 
@@ -26,7 +27,7 @@ export const Editor: React.FC = () => {
   const [mapData, setMapData] = useState<GameMap>({
     width: DEFAULT_MAP_WIDTH,
     height: DEFAULT_MAP_HEIGHT,
-    tileSize: TILE_SIZE,
+    tileSize: DEFAULT_TILE_SIZE,
     backgroundColor: '#5C94FC', // Classic blue sky
     tiles: Array(DEFAULT_MAP_HEIGHT).fill(null).map(() => Array(DEFAULT_MAP_WIDTH).fill(0)),
     objects: []
@@ -105,6 +106,9 @@ export const Editor: React.FC = () => {
 
   const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean, isDrag: boolean) => {
     if (x < 0 || y < 0 || x >= mapData.width || y >= mapData.height) return;
+    
+    // Use the CURRENT tile size from mapData
+    const currentTileSize = mapData.tileSize;
 
     // Erase Logic: Triggered by Right Click OR Eraser Tool
     if (isRightClick || selectedElementId === TOOL_ERASER) {
@@ -114,11 +118,11 @@ export const Editor: React.FC = () => {
       newTiles[y][x] = 0;
 
       // 2. Remove objects at this location
-      const pixelX = x * TILE_SIZE;
-      const pixelY = y * TILE_SIZE;
+      const pixelX = x * currentTileSize;
+      const pixelY = y * currentTileSize;
       const newObjects = mapData.objects.filter(o => 
         // Simple collision check for deletion
-        !(o.x >= pixelX && o.x < pixelX + TILE_SIZE && o.y >= pixelY && o.y < pixelY + TILE_SIZE)
+        !(o.x >= pixelX && o.x < pixelX + currentTileSize && o.y >= pixelY && o.y < pixelY + currentTileSize)
       );
 
       setMapData(prev => ({ ...prev, tiles: newTiles, objects: newObjects }));
@@ -140,8 +144,8 @@ export const Editor: React.FC = () => {
       let textContent: string | undefined = undefined;
 
       // Check for duplicates (prevents object stacking during drag)
-      const pixelX = x * TILE_SIZE;
-      const pixelY = y * TILE_SIZE;
+      const pixelX = x * currentTileSize;
+      const pixelY = y * currentTileSize;
       
       const existingObj = mapData.objects.find(o => 
           o.x === pixelX && o.y === pixelY && o.type === element.name
@@ -223,8 +227,6 @@ export const Editor: React.FC = () => {
         selectedId={selectedElementId} 
         onSelect={setSelectedElementId} 
         onClearMap={handleClearMap}
-        backgroundColor={mapData.backgroundColor}
-        onBackgroundColorChange={handleBackgroundColorChange}
       />
 
       {/* Center: Canvas */}
@@ -255,6 +257,7 @@ export const Editor: React.FC = () => {
         onImport={handleImport}
         onSave={handleSaveToStorage}
         onPlayTest={handlePlayTest}
+        onBackgroundColorChange={handleBackgroundColorChange}
       />
 
       {/* Play Test Modal */}
@@ -264,6 +267,15 @@ export const Editor: React.FC = () => {
                 className="relative bg-black border-4 border-gray-700 rounded-lg shadow-2xl overflow-hidden flex flex-col" 
                 style={{ width: `${testConfig.width}px`, height: `${testConfig.height}px` }}
               >
+                  {/* Close Button */}
+                  <button 
+                    onClick={() => setIsPlayTesting(false)}
+                    className="absolute top-2 right-2 z-50 bg-red-600 hover:bg-red-500 text-white p-1 rounded-full shadow-lg"
+                    title="Close Game"
+                  >
+                      <X size={24} />
+                  </button>
+
                   <Game 
                       initialMapData={mapData} 
                       width={testConfig.width} 
