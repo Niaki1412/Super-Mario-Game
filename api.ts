@@ -1,4 +1,3 @@
-
 export const API_BASE = '/api';
 
 export interface UserCreate {
@@ -22,6 +21,34 @@ export interface UserOut {
   id: number;
   username: string;
   mail: string;
+}
+
+// Map Interfaces
+export interface MapIn {
+  id?: number | null;
+  map_data: string; // JSON string of GameMap
+  is_public?: boolean;
+}
+
+export interface MapOut {
+  id: number;
+  user_id: number;
+  map_data: string; // JSON string
+  is_public: boolean;
+  status: number;
+  create_at: string;
+  update_at: string;
+}
+
+export interface DeleteIn {
+  map_id: number;
+}
+
+export interface PublishIn {
+  map_id: number;
+  title: string;
+  description?: string | null;
+  cover?: string | null;
 }
 
 // Helper for handling headers
@@ -70,11 +97,59 @@ export const logoutUser = async (token: string): Promise<void> => {
   });
 };
 
-export const getUserProfile = async (token: string): Promise<any> => {
+export const getUserProfile = async (token: string): Promise<UserOut[]> => {
   const res = await fetch(`${API_BASE}/profile`, {
     method: 'GET',
     headers: getHeaders(token),
   });
   if (!res.ok) throw new Error('Failed to fetch profile');
   return res.json();
+};
+
+// --- Map Endpoints ---
+
+export const saveMap = async (data: MapIn, token: string): Promise<MapOut> => {
+   const res = await fetch(`${API_BASE}/map/save`, {
+     method: 'POST',
+     headers: getHeaders(token),
+     body: JSON.stringify(data)
+   });
+   if (!res.ok) throw new Error('Failed to save map');
+   return res.json();
+};
+
+export const getMyMaps = async (token: string): Promise<MapOut[]> => {
+   const res = await fetch(`${API_BASE}/my_maps`, {
+     method: 'GET',
+     headers: getHeaders(token)
+   });
+   if (!res.ok) throw new Error('Failed to fetch maps');
+   return res.json();
+};
+
+export const deleteMap = async (data: DeleteIn, token: string): Promise<void> => {
+   const res = await fetch(`${API_BASE}/map/delete`, {
+     method: 'POST',
+     headers: getHeaders(token),
+     body: JSON.stringify(data)
+   });
+   if (!res.ok) throw new Error('Failed to delete map');
+};
+
+export const getPublicMaps = async (): Promise<any> => {
+   const res = await fetch(`${API_BASE}/public_map_list`, {
+     method: 'GET',
+     headers: getHeaders()
+   });
+   if (!res.ok) throw new Error('Failed to fetch public maps');
+   return res.json();
+};
+
+export const publishMap = async (data: PublishIn, token: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/publish/map`, {
+      method: 'POST',
+      headers: getHeaders(token),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to publish map');
 };

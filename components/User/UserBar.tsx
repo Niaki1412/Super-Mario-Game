@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, LogOut, LogIn, UserPlus, X } from 'lucide-react';
 import { loginUser, registerUser, logoutUser } from '../../api';
