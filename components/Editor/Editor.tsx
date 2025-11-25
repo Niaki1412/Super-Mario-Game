@@ -19,6 +19,10 @@ export const Editor: React.FC = () => {
   const [mapName, setMapName] = useState("my_mario_map");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isPlayTesting, setIsPlayTesting] = useState(false);
+  
+  // Play Test Configuration
+  const [testConfig, setTestConfig] = useState({ width: 800, height: 600 });
+
   const [mapData, setMapData] = useState<GameMap>({
     width: DEFAULT_MAP_WIDTH,
     height: DEFAULT_MAP_HEIGHT,
@@ -30,6 +34,12 @@ export const Editor: React.FC = () => {
 
   // --- Init ---
   useEffect(() => {
+    // Initialize Test Config to 90% of screen
+    setTestConfig({
+        width: Math.floor(window.innerWidth * 0.9),
+        height: Math.floor(window.innerHeight * 0.9)
+    });
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -230,6 +240,8 @@ export const Editor: React.FC = () => {
         mapData={mapData}
         mapName={mapName}
         lastSaved={lastSaved}
+        testConfig={testConfig}
+        onTestConfigChange={setTestConfig}
         onMapNameChange={setMapName}
         onUpdateMap={handleUpdateMap}
         onExport={handleExport}
@@ -240,12 +252,15 @@ export const Editor: React.FC = () => {
 
       {/* Play Test Modal */}
       {isPlayTesting && (
-          <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-8 backdrop-blur-sm">
-              <div className="relative bg-black border-4 border-gray-700 rounded-lg shadow-2xl overflow-hidden" style={{ width: '800px', height: '600px' }}>
+          <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+              <div 
+                className="relative bg-black border-4 border-gray-700 rounded-lg shadow-2xl overflow-hidden flex flex-col" 
+                style={{ width: `${testConfig.width}px`, height: `${testConfig.height}px` }}
+              >
                   <Game 
                       initialMapData={mapData} 
-                      width={800} 
-                      height={600} 
+                      width={testConfig.width} 
+                      height={testConfig.height} 
                       embedded={true}
                       onClose={() => setIsPlayTesting(false)}
                   />

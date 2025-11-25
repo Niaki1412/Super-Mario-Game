@@ -7,6 +7,8 @@ interface PropertiesPanelProps {
   mapData: GameMap;
   mapName: string;
   lastSaved: Date | null;
+  testConfig: { width: number, height: number };
+  onTestConfigChange: (config: { width: number, height: number }) => void;
   onMapNameChange: (name: string) => void;
   onUpdateMap: (newData: Partial<GameMap>) => void;
   onExport: () => void;
@@ -19,6 +21,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   mapData, 
   mapName,
   lastSaved,
+  testConfig,
+  onTestConfigChange,
   onMapNameChange,
   onUpdateMap, 
   onExport,
@@ -30,10 +34,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const handleDimensionChange = (key: 'width' | 'height', value: string) => {
     const numValue = parseInt(value, 10);
     if (isNaN(numValue) || numValue < 1) return;
-    
-    // Logic to resize the tiles array handled in parent or helper
-    // Here we just pass the desired dimension
     onUpdateMap({ [key]: numValue });
+  };
+
+  const handleTestConfigChange = (key: 'width' | 'height', value: string) => {
+      const num = parseInt(value, 10);
+      if (isNaN(num) || num < 100) return;
+      onTestConfigChange({ ...testConfig, [key]: num });
   };
 
   return (
@@ -117,6 +124,27 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                  Last saved: {lastSaved.toLocaleTimeString()}
              </div>
          )}
+
+         <div className="grid grid-cols-2 gap-2">
+             <div>
+                 <label className="block text-[10px] text-gray-400 mb-1">Test Width</label>
+                 <input 
+                    type="number" 
+                    value={testConfig.width}
+                    onChange={(e) => handleTestConfigChange('width', e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs"
+                 />
+             </div>
+             <div>
+                 <label className="block text-[10px] text-gray-400 mb-1">Test Height</label>
+                 <input 
+                    type="number" 
+                    value={testConfig.height}
+                    onChange={(e) => handleTestConfigChange('height', e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs"
+                 />
+             </div>
+         </div>
 
          <button 
             onClick={onPlayTest}
