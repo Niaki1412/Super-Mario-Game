@@ -248,7 +248,8 @@ export const Game: React.FC<GameProps> = ({
         // --- GAME LOOP ---
         app.ticker.add((ticker) => {
             if (isGameOverRef.current || isWonRef.current || !mapRef.current) return;
-            const delta = ticker.deltaTime;
+            // Clamp delta to prevent huge jumps on lag spike or init
+            const delta = Math.min(ticker.deltaTime, 2.0);
 
             updatePhysics(delta);
             render(app);
@@ -276,7 +277,7 @@ export const Game: React.FC<GameProps> = ({
       const tileSize = map.tileSize;
       
       const phys = PLAYER_CONFIG.physics;
-      const scaleRatio = tileSize / 32; // Scale physics forces if needed or keep uniform
+      const scaleRatio = tileSize / 32; // Scale physics forces to match visual scale
 
       // Filter entities
       entitiesRef.current = entities.filter(e => {
@@ -301,8 +302,8 @@ export const Game: React.FC<GameProps> = ({
 
           // 1. Gravity
           if (entity.hasGravity) {
-            entity.vy += phys.gravity * delta;
-            if (entity.vy > phys.terminalVelocity) entity.vy = phys.terminalVelocity;
+            entity.vy += phys.gravity * scaleRatio * delta;
+            if (entity.vy > phys.terminalVelocity * scaleRatio) entity.vy = phys.terminalVelocity * scaleRatio;
           }
 
           // Effects
@@ -344,9 +345,9 @@ export const Game: React.FC<GameProps> = ({
           if (entity.isPlayer && !entity.isDead) {
               // Movement
               if (keys[controls.left]) {
-                  entity.vx -= phys.acceleration * delta;
+                  entity.vx -= phys.acceleration * scaleRatio * delta;
               } else if (keys[controls.right]) {
-                  entity.vx += phys.acceleration * delta;
+                  entity.vx += phys.acceleration * scaleRatio * delta;
               } else {
                   entity.vx *= phys.friction;
               }
@@ -384,7 +385,7 @@ export const Game: React.FC<GameProps> = ({
                   entity.jumpCount = 0; // Reset jumps
                   if (jumpRequested) {
                       const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
-                      entity.vy = force; // Physics don't strictly need scaling if gravity/speed is abstract
+                      entity.vy = force * scaleRatio;
                       entity.grounded = false;
                       entity.jumpCount = 1;
                       audioManager.playJump();
@@ -393,7 +394,7 @@ export const Game: React.FC<GameProps> = ({
                   // Air Logic / Double Jump
                   if (jumpRequested && (entity.jumpCount || 0) < 2) {
                       const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
-                      entity.vy = force * 0.9; 
+                      entity.vy = force * 0.9 * scaleRatio; 
                       entity.jumpCount = (entity.jumpCount || 0) + 1;
                       audioManager.playJump();
                       spawnParticles(entity.x, entity.y + entity.h, 0xFFFFFF); 
@@ -418,8 +419,9 @@ export const Game: React.FC<GameProps> = ({
               }
 
               // Clamp Speed
-              if (entity.vx > phys.runSpeed) entity.vx = phys.runSpeed;
-              if (entity.vx < -phys.runSpeed) entity.vx = -phys.runSpeed;
+              const maxSpeed = phys.runSpeed * scaleRatio;
+              if (entity.vx > maxSpeed) entity.vx = maxSpeed;
+              if (entity.vx < -maxSpeed) entity.vx = -maxSpeed;
 
               // Death fall
               if (entity.y > map.height * tileSize) {
@@ -435,7 +437,7 @@ export const Game: React.FC<GameProps> = ({
                    
                    entity.plantTimer = (entity.plantTimer || 0) + delta;
                    const MAX_HEIGHT = -tileSize * 0.8;
-                   const MOVE_SPEED = 0.5;
+                   const MOVE_SPEED = 0.5 * scaleRatio;
 
                    if (entity.plantState === 'hidden') {
                        if (entity.plantTimer > 180) { 
@@ -590,7 +592,7 @@ export const Game: React.FC<GameProps> = ({
 
                           if (isStomp) {
                               if (other.type === 'Turtle') {
-                                  entity.vy = phys.bounceForce;
+                                  entity.vy = phys.bounceForce * scaleRatio;
                                   audioManager.playStomp();
 
                                   if (!other.isShell) {
@@ -602,7 +604,7 @@ export const Game: React.FC<GameProps> = ({
                                   }
                               } else {
                                   other.isDead = true;
-                                  entity.vy = phys.bounceForce; 
+                                  entity.vy = phys.bounceForce * scaleRatio; 
                                   addScore(100);
                                   spawnParticles(other.x, other.y, 0xA0522D);
                                   audioManager.playStomp();
@@ -610,7 +612,7 @@ export const Game: React.FC<GameProps> = ({
                           } else {
                               if (other.type === 'Turtle' && other.isShell && Math.abs(other.vx) < 0.1) {
                                   const dir = entity.x < other.x ? 1 : -1;
-                                  other.vx = dir * 8;
+                                  other.vx = dir * 8 * scaleRatio;
                                   other.x += dir * 4; 
                                   audioManager.playBump();
                               } else {
@@ -677,6 +679,8 @@ export const Game: React.FC<GameProps> = ({
 
   const spawnBullet = (player: Entity) => {
       audioManager.playShoot();
+      const tileSize = mapRef.current!.tileSize;
+      const scaleRatio = tileSize / 32;
       const dir = lastDirRef.current;
       entitiesRef.current.push({
           id: `bullet-${Date.now()}`,
@@ -685,7 +689,7 @@ export const Game: React.FC<GameProps> = ({
           y: player.y + player.h * 0.5,
           w: PLAYER_CONFIG.projectile.width,
           h: PLAYER_CONFIG.projectile.height,
-          vx: dir * PLAYER_CONFIG.physics.bulletSpeed,
+          vx: dir * PLAYER_CONFIG.physics.bulletSpeed * scaleRatio,
           vy: 0,
           isDead: false,
           grounded: false,
@@ -804,10 +808,12 @@ export const Game: React.FC<GameProps> = ({
       setGameOver(true);
       
       audioManager.playDie();
+      const tileSize = mapRef.current!.tileSize;
+      const scaleRatio = tileSize / 32;
 
       const player = entitiesRef.current.find(e => e.isPlayer);
       if (player) {
-          player.vy = PLAYER_CONFIG.small.jumpForce;
+          player.vy = PLAYER_CONFIG.small.jumpForce * scaleRatio;
           player.isDead = true; 
       }
   };
@@ -1008,6 +1014,11 @@ export const Game: React.FC<GameProps> = ({
           const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
           keysRef.current[k] = true;
           if (currentMap) audioManager.resume();
+
+          // Quick Exit
+          if (e.key === 'Escape') {
+              handleExit();
+          }
       };
 
       const handleKeyUp = (e: KeyboardEvent) => {
@@ -1095,7 +1106,7 @@ export const Game: React.FC<GameProps> = ({
         </div>
         {!embedded && (
             <div className="absolute top-10 left-4 text-white font-mono text-xs opacity-70 drop-shadow-md z-10 select-none">
-                CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} Move, {getKeyDisplay(controls.down)} Crouch, {getKeyDisplay(controls.jump)} Jump, {getKeyDisplay(controls.doubleJump)} Double Jump
+                CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} Move, {getKeyDisplay(controls.down)} Crouch, {getKeyDisplay(controls.jump)} Jump, {getKeyDisplay(controls.doubleJump)} Double Jump, ESC to Exit
             </div>
         )}
 
