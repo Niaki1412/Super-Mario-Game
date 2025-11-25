@@ -209,8 +209,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     const currentMap = mapDataRef.current;
 
     g.clear();
-    // Clear previous text labels
-    labels.removeChildren(); 
+    
+    // FIX: MEMORY LEAK
+    // Explicitly destroy children with texture: true to free GPU memory
+    // otherwise new Text textures are created every frame until crash.
+    const oldLabels = labels.removeChildren();
+    for (const child of oldLabels) {
+        child.destroy({ texture: true, children: true });
+    }
 
     // Helper to draw text
     const addLabel = (text: string, x: number, y: number, align: 'center' | 'right' = 'center', color = 0x999999, size = 10, bold = false) => {

@@ -879,7 +879,13 @@ export const Game: React.FC = () => {
       if (!g || !labels) return;
 
       g.clear();
-      labels.removeChildren();
+      
+      // FIX: MEMORY LEAK
+      // Explicitly destroy children with texture: true
+      const oldLabels = labels.removeChildren();
+      for (const child of oldLabels) {
+          child.destroy({ texture: true, children: true });
+      }
 
       const player = entitiesRef.current.find(e => e.isPlayer);
       let cameraX = 0;
