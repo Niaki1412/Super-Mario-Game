@@ -49,6 +49,11 @@ export interface MapDetail {
   update_at?: string;
 }
 
+// Specific response for Save Map endpoint
+export interface SaveMapResponse {
+    map_id: number;
+}
+
 // Keeping legacy MapOut for compatibility if needed, but aligned with Detail
 export type MapOut = MapDetail;
 
@@ -120,15 +125,18 @@ export const getUserProfile = async (token: string): Promise<UserOut[]> => {
 
 // --- Map Endpoints ---
 
-export const saveMap = async (data: MapIn, token: string): Promise<MapDetail> => {
+export const saveMap = async (data: MapIn, token: string): Promise<SaveMapResponse> => {
    const res = await fetch(`${API_BASE}/map/save`, {
      method: 'POST',
      headers: getHeaders(token),
      body: JSON.stringify(data)
    });
-   if (!res.ok) throw new Error('Failed to save map');
+   if (!res.ok) {
+       const err = await res.json();
+       throw new Error(err.detail || 'Failed to save map');
+   }
    const json = await res.json();
-   return json.data || json; 
+   return json.data; // Expected { data: { map_id: 3 } }
 };
 
 export const getMyMaps = async (token: string): Promise<MapListItem[]> => {

@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { GameMap } from '../../types';
-import { Save, Play, ArrowUpFromLine, ArrowDownToLine, Palette } from 'lucide-react';
+import { Save, Play, ArrowUpFromLine, ArrowDownToLine, Palette, CloudUpload } from 'lucide-react';
 
 interface PropertiesPanelProps {
   mapData: GameMap;
@@ -14,6 +13,7 @@ interface PropertiesPanelProps {
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSave: () => void;
+  onCloudSave: () => void;
   onPlayTest: () => void;
   onBackgroundColorChange: (color: string) => void;
 }
@@ -29,6 +29,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onExport,
   onImport,
   onSave,
+  onCloudSave,
   onPlayTest,
   onBackgroundColorChange
 }) => {
@@ -173,13 +174,24 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
              <span>Play Test</span>
          </button>
 
-         <button 
-            onClick={onSave}
-            className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow transition-colors flex justify-center items-center gap-2"
-         >
-            <Save size={16} />
-            <span>Save to Browser</span>
-         </button>
+         <div className="grid grid-cols-2 gap-2">
+            <button 
+                onClick={onSave}
+                className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-3 rounded shadow transition-colors flex justify-center items-center gap-1 text-xs"
+                title="Save to Browser Storage"
+            >
+                <Save size={14} />
+                <span>Local</span>
+            </button>
+            <button 
+                onClick={onCloudSave}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded shadow transition-colors flex justify-center items-center gap-1 text-xs"
+                title="Save to Cloud"
+            >
+                <CloudUpload size={14} />
+                <span>Cloud</span>
+            </button>
+         </div>
 
          {/* Import / Export Circular Buttons */}
          <div className="flex gap-4 justify-center items-center pt-2">
