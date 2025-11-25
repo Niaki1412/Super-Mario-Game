@@ -22,8 +22,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
-  const graphicsRef = useRef<PIXI.Graphics | null>(null);
-  const labelsContainerRef = useRef<PIXI.Container | null>(null);
+  
+  // Layer Refs
+  const staticGraphicsRef = useRef<PIXI.Graphics | null>(null);
+  const staticLabelsRef = useRef<PIXI.Container | null>(null);
+  const dynamicGraphicsRef = useRef<PIXI.Graphics | null>(null);
+  const dynamicLabelsRef = useRef<PIXI.Container | null>(null);
+
   const [isAppReady, setIsAppReady] = useState(false);
 
   // Drag State
@@ -36,7 +41,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     onTileClickRef.current = onTileClick;
   }, [onTileClick]);
 
-  // Keep ref to mapData for the ticker
+  // Keep ref to mapData for the ticker (for objects)
   const mapDataRef = useRef(mapData);
   useEffect(() => {
     mapDataRef.current = mapData;
@@ -85,23 +90,31 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         appRef.current = app;
 
         // Setup Scene Layers
-        const graphics = new PIXI.Graphics();
-        graphicsRef.current = graphics;
-        app.stage.addChild(graphics);
+        // 1. Static Layer (Grid, Ruler, Tiles) - Drawn only on change
+        const staticG = new PIXI.Graphics();
+        staticGraphicsRef.current = staticG;
+        app.stage.addChild(staticG);
 
-        const labelsContainer = new PIXI.Container();
-        labelsContainerRef.current = labelsContainer;
-        app.stage.addChild(labelsContainer);
+        const staticL = new PIXI.Container();
+        staticLabelsRef.current = staticL;
+        app.stage.addChild(staticL);
+
+        // 2. Dynamic Layer (Objects, Animations) - Drawn every frame
+        const dynamicG = new PIXI.Graphics();
+        dynamicGraphicsRef.current = dynamicG;
+        app.stage.addChild(dynamicG);
+
+        const dynamicL = new PIXI.Container();
+        dynamicLabelsRef.current = dynamicL;
+        app.stage.addChild(dynamicL);
 
         // Interaction
         app.stage.eventMode = 'static';
         app.stage.hitArea = new PIXI.Rectangle(0, 0, totalWidth, totalHeight);
 
         const getGridPos = (e: PIXI.FederatedPointerEvent) => {
-            // Adjust input coordinates by the Ruler Offset
             const adjX = e.global.x - RULER_OFFSET;
             const adjY = e.global.y - RULER_OFFSET;
-            
             const x = Math.floor(adjX / TILE_SIZE);
             const y = Math.floor(adjY / TILE_SIZE);
             return { x, y };
@@ -109,33 +122,25 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
         const onPointerDown = (e: PIXI.FederatedPointerEvent) => {
             const { x, y } = getGridPos(e);
-            
-            // Ignore clicks on the ruler itself
             if (x < 0 || y < 0) return;
             
             isPaintingRef.current = true;
             lastGridPosRef.current = { x, y };
 
             const isRightClick = e.button === 2;
-            // Pass isDrag = false for initial click
             onTileClickRef.current(x, y, isRightClick, false);
         };
 
         const onPointerMove = (e: PIXI.FederatedPointerEvent) => {
             if (!isPaintingRef.current) return;
-
             const { x, y } = getGridPos(e);
             if (x < 0 || y < 0) return;
 
-            // Avoid triggering multiple times for the same tile
             const last = lastGridPosRef.current;
             if (last && last.x === x && last.y === y) return;
 
             lastGridPosRef.current = { x, y };
-
-            // Determine if right click is held (bitmask 2)
             const isRightClick = (e.buttons & 2) === 2; 
-            // Pass isDrag = true for move events
             onTileClickRef.current(x, y, isRightClick, true);
         };
 
@@ -149,8 +154,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         app.stage.on('pointerup', onPointerUp);
         app.stage.on('pointerupoutside', onPointerUp);
 
-        // Add Rendering Loop
-        app.ticker.add(drawLoop);
+        // Add Rendering Loop for DYNAMIC objects only
+        app.ticker.add(drawDynamicLoop);
 
         setIsAppReady(true);
     };
@@ -162,11 +167,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       setIsAppReady(false);
       
       if (appRef.current) {
-        appRef.current.ticker.remove(drawLoop);
+        appRef.current.ticker.remove(drawDynamicLoop);
         appRef.current.destroy({ removeView: true });
         appRef.current = null;
-        graphicsRef.current = null;
-        labelsContainerRef.current = null;
+        staticGraphicsRef.current = null;
+        staticLabelsRef.current = null;
+        dynamicGraphicsRef.current = null;
+        dynamicLabelsRef.current = null;
       }
     };
   }, []); // Run once on mount
@@ -200,102 +207,119 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   }, [mapData.width, mapData.height, isAppReady]);
 
 
-  // Drawing Loop Function
-  const drawLoop = () => {
-    if (!graphicsRef.current || !labelsContainerRef.current) return;
+  // --- RENDERING LOGIC ---
 
-    const g = graphicsRef.current;
-    const labels = labelsContainerRef.current;
+  // Helper to draw text
+  const addLabel = (container: PIXI.Container, text: string, x: number, y: number, align: 'center' | 'right' = 'center', color = 0x999999, size = 10, bold = false) => {
+    const t = new PIXI.Text({
+        text,
+        style: {
+            fontFamily: 'Arial',
+            fontSize: size,
+            fontWeight: bold ? 'bold' : 'normal',
+            fill: color,
+            align: align
+        }
+    });
+    t.x = x;
+    t.y = y;
+    t.anchor.set(align === 'center' ? 0.5 : 1, 0.5);
+    container.addChild(t);
+  };
+
+  // 1. Draw Static Layer (Grid, Ruler, Tiles)
+  // This is called via useEffect whenever map structure changes, NOT every frame.
+  const drawStatic = () => {
+      if (!staticGraphicsRef.current || !staticLabelsRef.current) return;
+      
+      const g = staticGraphicsRef.current;
+      const labels = staticLabelsRef.current;
+      
+      g.clear();
+      
+      // Destroy old labels to free memory
+      const oldLabels = labels.removeChildren();
+      for (const child of oldLabels) {
+          child.destroy({ texture: true, children: true });
+      }
+
+      // --- Draw Ruler Background ---
+      g.rect(0, 0, mapData.width * TILE_SIZE + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a);
+      g.rect(0, 0, RULER_OFFSET, mapData.height * TILE_SIZE + RULER_OFFSET).fill(0x1a1a1a);
+      
+      // --- Draw Grid & Labels ---
+      // Vertical
+      for (let x = 0; x <= mapData.width; x++) {
+        const xPos = x * TILE_SIZE + RULER_OFFSET;
+        g.moveTo(xPos, RULER_OFFSET);
+        g.lineTo(xPos, mapData.height * TILE_SIZE + RULER_OFFSET);
+        if (x < mapData.width) {
+            addLabel(labels, `${x}`, xPos + TILE_SIZE/2, RULER_OFFSET / 2);
+        }
+      }
+      // Horizontal
+      for (let y = 0; y <= mapData.height; y++) {
+        const yPos = y * TILE_SIZE + RULER_OFFSET;
+        g.moveTo(RULER_OFFSET, yPos);
+        g.lineTo(mapData.width * TILE_SIZE + RULER_OFFSET, yPos);
+        if (y < mapData.height) {
+            addLabel(labels, `${y}`, RULER_OFFSET / 2, yPos + TILE_SIZE/2);
+        }
+      }
+      g.stroke({ width: 1, color: 0x555555, alpha: 0.5 });
+
+      // --- Draw Tiles ---
+      mapData.tiles.forEach((row, y) => {
+        row.forEach((tileId, x) => {
+          if (tileId !== 0) {
+            const config = GAME_ELEMENTS_REGISTRY.find(el => el.id === tileId);
+            if (config) {
+              const drawX = x * TILE_SIZE + RULER_OFFSET;
+              const drawY = y * TILE_SIZE + RULER_OFFSET;
+              config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE);
+            }
+          }
+        });
+      });
+  };
+
+  // 2. Draw Dynamic Layer (Objects)
+  // This is called every frame by the ticker to support animations (Cloud, etc.)
+  const drawDynamicLoop = () => {
+    if (!dynamicGraphicsRef.current || !dynamicLabelsRef.current) return;
+
+    const g = dynamicGraphicsRef.current;
+    const labels = dynamicLabelsRef.current;
     const currentMap = mapDataRef.current;
 
     g.clear();
     
-    // FIX: MEMORY LEAK
-    // Explicitly destroy children with texture: true to free GPU memory
-    // otherwise new Text textures are created every frame until crash.
+    // Destroy old dynamic labels (e.g., text decorations)
     const oldLabels = labels.removeChildren();
     for (const child of oldLabels) {
         child.destroy({ texture: true, children: true });
     }
 
-    // Helper to draw text
-    const addLabel = (text: string, x: number, y: number, align: 'center' | 'right' = 'center', color = 0x999999, size = 10, bold = false) => {
-        const t = new PIXI.Text({
-            text,
-            style: {
-                fontFamily: 'Arial',
-                fontSize: size,
-                fontWeight: bold ? 'bold' : 'normal',
-                fill: color,
-                align: align
-            }
-        });
-        t.x = x;
-        t.y = y;
-        t.anchor.set(align === 'center' ? 0.5 : 1, 0.5);
-        labels.addChild(t);
-    };
-
-    // --- 1. Draw Ruler Background ---
-    g.rect(0, 0, currentMap.width * TILE_SIZE + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a); // Top
-    g.rect(0, 0, RULER_OFFSET, currentMap.height * TILE_SIZE + RULER_OFFSET).fill(0x1a1a1a); // Left
-    
-    // --- 2. Draw Grid & Labels ---
-    
-    // Vertical Lines & Top Labels
-    for (let x = 0; x <= currentMap.width; x++) {
-      const xPos = x * TILE_SIZE + RULER_OFFSET;
-      g.moveTo(xPos, RULER_OFFSET);
-      g.lineTo(xPos, currentMap.height * TILE_SIZE + RULER_OFFSET);
-      
-      // Draw label (skip last line for label if it matches width exactly)
-      if (x < currentMap.width) {
-          addLabel(`${x}`, xPos + TILE_SIZE/2, RULER_OFFSET / 2);
-      }
-    }
-
-    // Horizontal Lines & Left Labels
-    for (let y = 0; y <= currentMap.height; y++) {
-      const yPos = y * TILE_SIZE + RULER_OFFSET;
-      g.moveTo(RULER_OFFSET, yPos);
-      g.lineTo(currentMap.width * TILE_SIZE + RULER_OFFSET, yPos);
-
-      // Draw label
-      if (y < currentMap.height) {
-          addLabel(`${y}`, RULER_OFFSET / 2, yPos + TILE_SIZE/2);
-      }
-    }
-    g.stroke({ width: 1, color: 0x555555, alpha: 0.5 });
-
-
-    // --- 3. Draw Tiles ---
-    currentMap.tiles.forEach((row, y) => {
-      row.forEach((tileId, x) => {
-        if (tileId !== 0) {
-          const config = GAME_ELEMENTS_REGISTRY.find(el => el.id === tileId);
-          if (config) {
-            const drawX = x * TILE_SIZE + RULER_OFFSET;
-            const drawY = y * TILE_SIZE + RULER_OFFSET;
-            config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE);
-          }
-        }
-      });
-    });
-
-    // --- 4. Draw Objects ---
+    // --- Draw Objects ---
     currentMap.objects.forEach((obj) => {
         const config = GAME_ELEMENTS_REGISTRY.find(el => el.name.toLowerCase() === obj.type.toLowerCase() || (el.type === 'object' && el.name === obj.type));
         
         if (config) {
             const drawX = obj.x + RULER_OFFSET;
             const drawY = obj.y + RULER_OFFSET;
-            // Pass the object data as the 7th argument
             config.renderPixi(g, labels, drawX, drawY, TILE_SIZE, TILE_SIZE, obj);
         }
     });
   };
 
-  // Determine cursor style based on tool
+  // Trigger Static Redraw when map structure changes
+  useEffect(() => {
+      if (isAppReady) {
+          drawStatic();
+      }
+  }, [mapData.tiles, mapData.width, mapData.height, isAppReady]);
+
+
   const getCursorStyle = () => {
       if (selectedElementId === TOOL_ERASER) return 'cursor-[url(https://www.google.com/url?sa=i&url=https%3A%2F%2Ficon-icons.com%2Ficon%2Feraser%2F112674&psig=AOvVaw0_..._nope_just_use_class)] cursor-crosshair';
       if (selectedElementId) return 'cursor-pointer';
