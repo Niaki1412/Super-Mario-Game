@@ -82,7 +82,18 @@ export const Editor: React.FC = () => {
   // Update map properties (width/height) while preserving data
   const handleUpdateMap = (newData: Partial<GameMap>) => {
     setMapData((prev) => {
-      const updated = { ...prev, ...newData };
+      let updated = { ...prev, ...newData };
+
+      // Handle Tile Size Scaling Logic
+      // If tileSize changed, we must scale all object pixel coordinates so they stay in the same visual grid slot
+      if (newData.tileSize !== undefined && newData.tileSize !== prev.tileSize) {
+          const scale = newData.tileSize / prev.tileSize;
+          updated.objects = prev.objects.map(obj => ({
+              ...obj,
+              x: obj.x * scale,
+              y: obj.y * scale
+          }));
+      }
 
       // If dimensions changed, resize the tiles array safely
       if (newData.width !== undefined || newData.height !== undefined) {
