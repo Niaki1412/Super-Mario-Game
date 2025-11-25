@@ -47,6 +47,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     mapDataRef.current = mapData;
   }, [mapData]);
 
+  // Update background color when it changes
+  useEffect(() => {
+      if (appRef.current && isAppReady) {
+          appRef.current.renderer.background.color = mapData.backgroundColor;
+      }
+  }, [mapData.backgroundColor, isAppReady]);
+
   // Initialize Pixi
   useEffect(() => {
     let isMounted = true;
@@ -62,7 +69,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           await app.init({
             width: totalWidth,
             height: totalHeight,
-            backgroundColor: 0x333333, 
+            backgroundColor: mapData.backgroundColor || 0x333333, 
             backgroundAlpha: 1,
             resolution: window.devicePixelRatio || 1,
             autoDensity: true,

@@ -99,6 +99,10 @@ export const Editor: React.FC = () => {
     });
   };
 
+  const handleBackgroundColorChange = (color: string) => {
+      setMapData(prev => ({ ...prev, backgroundColor: color }));
+  };
+
   const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean, isDrag: boolean) => {
     if (x < 0 || y < 0 || x >= mapData.width || y >= mapData.height) return;
 
@@ -171,6 +175,7 @@ export const Editor: React.FC = () => {
     if (window.confirm("Are you sure you want to clear the entire map? This cannot be undone.")) {
       setMapData(prev => ({
         ...prev,
+        backgroundColor: '#5C94FC',
         tiles: Array(prev.height).fill(null).map(() => Array(prev.width).fill(0)),
         objects: []
       }));
@@ -218,6 +223,8 @@ export const Editor: React.FC = () => {
         selectedId={selectedElementId} 
         onSelect={setSelectedElementId} 
         onClearMap={handleClearMap}
+        backgroundColor={mapData.backgroundColor}
+        onBackgroundColorChange={handleBackgroundColorChange}
       />
 
       {/* Center: Canvas */}
