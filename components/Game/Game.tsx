@@ -6,8 +6,8 @@ import { GameMap, Entity, Particle } from '../../types';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
-import { getMyMaps, getMapById, MapListItem } from '../../api';
-import { Cloud, CheckCircle } from 'lucide-react';
+import { getMyMaps, getMapById, deleteMap, MapListItem } from '../../api';
+import { Cloud, Trash2 } from 'lucide-react';
 
 const DEFAULT_CONTROLS = {
     left: 'a',
@@ -1094,6 +1094,25 @@ export const Game: React.FC<GameProps> = ({
       }
   };
 
+  const handleDeleteMap = async (e: React.MouseEvent, id: number) => {
+      e.stopPropagation(); // Prevent loading map when clicking delete
+      
+      if (!window.confirm("Are you sure you want to delete this map? This cannot be undone.")) {
+          return;
+      }
+
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      try {
+          await deleteMap({ map_id: id }, token);
+          setMyMaps(prev => prev.filter(m => m.id !== id));
+      } catch (error) {
+          console.error("Failed to delete map", error);
+          alert("Failed to delete map");
+      }
+  };
+
   const handleExit = () => {
       if (onClose) {
           onClose();
@@ -1128,17 +1147,28 @@ export const Game: React.FC<GameProps> = ({
                        ) : myMaps.length > 0 ? (
                            <div className="w-full grid grid-cols-1 gap-2 overflow-y-auto pr-2">
                                {myMaps.map((map) => (
-                                   <button 
+                                   <div 
                                       key={map.id}
-                                      onClick={() => handleLoadFromApi(map.id)}
-                                      className="group bg-gray-700 hover:bg-gray-600 p-3 rounded flex items-center justify-between border border-gray-600 hover:border-blue-500 transition-all"
+                                      className="group bg-gray-700 p-1 rounded flex items-center justify-between border border-gray-600 hover:border-blue-500 transition-all pr-2"
                                    >
-                                       <div className="flex flex-col items-start">
-                                           <span className="font-bold text-sm group-hover:text-blue-300">Map #{map.id}</span>
-                                           <span className="text-[10px] text-gray-400">Status: {map.status === 1 ? 'Active' : 'Draft'}</span>
-                                       </div>
-                                       <CheckCircle size={16} className="text-gray-500 group-hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                   </button>
+                                       <button 
+                                          onClick={() => handleLoadFromApi(map.id)}
+                                          className="flex-1 p-2 text-left hover:bg-gray-600 rounded mr-2"
+                                       >
+                                           <div className="flex flex-col items-start">
+                                               <span className="font-bold text-sm text-white group-hover:text-blue-300">Map #{map.id}</span>
+                                               <span className="text-[10px] text-gray-400">Status: {map.status === 1 ? 'Active' : 'Draft'}</span>
+                                           </div>
+                                       </button>
+                                       
+                                       <button 
+                                          onClick={(e) => handleDeleteMap(e, map.id)}
+                                          className="p-2 text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded transition-colors"
+                                          title="Delete Map"
+                                       >
+                                          <Trash2 size={16} />
+                                       </button>
+                                   </div>
                                ))}
                            </div>
                        ) : (
