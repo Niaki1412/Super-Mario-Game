@@ -1,3 +1,4 @@
+
 export const API_BASE = '/api';
 
 export interface UserCreate {
@@ -36,6 +37,15 @@ export interface MapListItem {
   id: number;
   status: number;
   user_id: number;
+}
+
+export interface PublicMapListItem {
+  id: number;
+  map_id: number;
+  title: string;
+  description: string | null;
+  cover: string | null;
+  create_at: string;
 }
 
 // Response from /api/map/<id>
@@ -151,7 +161,7 @@ export const getMyMaps = async (token: string): Promise<MapListItem[]> => {
    return json.data; 
 };
 
-export const getMapById = async (id: number, token: string): Promise<MapDetail> => {
+export const getMapById = async (id: number, token?: string | null): Promise<MapDetail> => {
     const res = await fetch(`${API_BASE}/map/${id}`, {
         method: 'GET',
         headers: getHeaders(token)
@@ -170,13 +180,14 @@ export const deleteMap = async (data: DeleteIn, token: string): Promise<void> =>
    if (!res.ok) throw new Error('Failed to delete map');
 };
 
-export const getPublicMaps = async (): Promise<any> => {
+export const getPublicMaps = async (): Promise<PublicMapListItem[]> => {
    const res = await fetch(`${API_BASE}/public_map_list`, {
      method: 'GET',
      headers: getHeaders()
    });
    if (!res.ok) throw new Error('Failed to fetch public maps');
-   return res.json();
+   const json = await res.json();
+   return json; // The provided example shows direct array return [ { ... } ]
 };
 
 export const publishMap = async (data: PublishIn, token: string): Promise<void> => {

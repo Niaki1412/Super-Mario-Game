@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle } from '../../types';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
@@ -34,6 +34,7 @@ export const Game: React.FC<GameProps> = ({
     embedded = false 
 }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   
@@ -64,7 +65,7 @@ export const Game: React.FC<GameProps> = ({
 
   // --- HELPERS ---
 
-  const checkRectCollision = (r1: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}) => {
+  const checkRectCollision = (r1: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}) => {
     return (
         r1.x < r2.x + r2.w &&
         r1.x + r1.w > r2.x &&
@@ -101,6 +102,14 @@ export const Game: React.FC<GameProps> = ({
         try { setControls({ ...DEFAULT_CONTROLS, ...JSON.parse(saved) }); } catch(e) {}
     }
   }, []);
+
+  // --- FETCH MAP FROM URL PARAM ---
+  useEffect(() => {
+      const mapIdParam = searchParams.get('id');
+      if (mapIdParam && !currentMap && !embedded) {
+          handleLoadFromApi(Number(mapIdParam), true); // Pass true for public fetch attempt
+      }
+  }, [searchParams]);
 
   // --- FETCH MAP LIST ---
   useEffect(() => {
@@ -1085,13 +1094,16 @@ export const Game: React.FC<GameProps> = ({
     reader.readAsText(file);
   };
 
-  const handleLoadFromApi = async (id: number) => {
+  const handleLoadFromApi = async (id: number, isPublic = false) => {
       const token = localStorage.getItem('access_token');
-      if (!token) {
+      if (!token && !isPublic) {
           alert("Please login to play cloud maps");
           return;
       }
       try {
+          // For public map list, the ID passed might be the primary key, but we need the map_id reference
+          // The logic in GameCenter passes the correct map_id.
+          // Also allow fetching without token if public
           const mapData = await getMapById(id, token);
           if (mapData.map_data) {
               // Ensure we parse the string back to JSON
