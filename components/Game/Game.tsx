@@ -158,6 +158,10 @@ export const Game: React.FC<GameProps> = ({
         appRef.current = app;
 
         // Setup Scene Layers
+        const bgLayer = new PIXI.Container();
+        bgLayer.label = 'game-background';
+        app.stage.addChild(bgLayer);
+
         const graphics = new PIXI.Graphics();
         graphics.label = 'game-graphics';
         app.stage.addChild(graphics);
@@ -165,6 +169,19 @@ export const Game: React.FC<GameProps> = ({
         const labels = new PIXI.Container();
         labels.label = 'game-labels';
         app.stage.addChild(labels);
+
+        // Setup Background Image
+        if (currentMap.backgroundImage && currentMap.backgroundImage.data) {
+            try {
+                const texture = await PIXI.Assets.load(currentMap.backgroundImage.data);
+                const bgSprite = new PIXI.Sprite(texture);
+                bgSprite.alpha = currentMap.backgroundImage.opacity;
+                bgSprite.scale.set(currentMap.backgroundImage.scale);
+                bgLayer.addChild(bgSprite);
+            } catch (e) {
+                console.error("Failed to load game background image", e);
+            }
+        }
 
         // Reset State
         mapRef.current = currentMap;

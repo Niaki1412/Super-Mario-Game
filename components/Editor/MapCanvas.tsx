@@ -24,6 +24,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const appRef = useRef<PIXI.Application | null>(null);
   
   // Layer Refs
+  const backgroundContainerRef = useRef<PIXI.Container | null>(null);
   const staticGraphicsRef = useRef<PIXI.Graphics | null>(null);
   const staticLabelsRef = useRef<PIXI.Container | null>(null);
   const dynamicGraphicsRef = useRef<PIXI.Graphics | null>(null);
@@ -99,7 +100,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
         appRef.current = app;
 
-        // Setup Scene Layers
+        // Setup Scene Layers (Order matters)
+        // 0. Background Image Layer
+        const bgL = new PIXI.Container();
+        backgroundContainerRef.current = bgL;
+        app.stage.addChild(bgL);
+
         // 1. Static Layer (Grid, Ruler, Tiles) - Drawn only on change
         const staticG = new PIXI.Graphics();
         staticGraphicsRef.current = staticG;
@@ -182,6 +188,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         appRef.current.ticker.remove(drawDynamicLoop);
         appRef.current.destroy({ removeView: true });
         appRef.current = null;
+        backgroundContainerRef.current = null;
         staticGraphicsRef.current = null;
         staticLabelsRef.current = null;
         dynamicGraphicsRef.current = null;
@@ -221,6 +228,30 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
 
   // --- RENDERING LOGIC ---
+
+  // Draw Background Image
+  useEffect(() => {
+      if (!isAppReady || !backgroundContainerRef.current) return;
+      const container = backgroundContainerRef.current;
+      
+      // Clear existing
+      container.removeChildren().forEach(c => c.destroy());
+
+      if (mapData.backgroundImage && mapData.backgroundImage.data) {
+          PIXI.Assets.load(mapData.backgroundImage.data).then((texture) => {
+              if (container.children.length > 0) return; // Avoid double add if race condition
+              
+              const sprite = new PIXI.Sprite(texture);
+              sprite.x = RULER_OFFSET;
+              sprite.y = RULER_OFFSET;
+              sprite.alpha = mapData.backgroundImage!.opacity;
+              sprite.scale.set(mapData.backgroundImage!.scale);
+              container.addChild(sprite);
+          }).catch(err => console.error("Failed to load bg image", err));
+      }
+
+  }, [mapData.backgroundImage, isAppReady]);
+
 
   // Helper to draw text
   const addLabel = (container: PIXI.Container, text: string, x: number, y: number, align: 'center' | 'right' = 'center', color = 0x999999, size = 10, bold = false) => {
@@ -268,7 +299,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         g.moveTo(xPos, RULER_OFFSET);
         g.lineTo(xPos, mapData.height * tileSize + RULER_OFFSET);
         if (x < mapData.width) {
-            // Draw coordinate every 1 or 5 steps depending on density? For now all
             addLabel(labels, `${x}`, xPos + tileSize/2, RULER_OFFSET / 2);
         }
       }

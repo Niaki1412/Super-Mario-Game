@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { GameMap } from '../../types';
-import { Save, Play, ArrowUpFromLine, ArrowDownToLine, Palette, CloudUpload } from 'lucide-react';
+import { Save, Play, ArrowUpFromLine, ArrowDownToLine, Palette, CloudUpload, Image as ImageIcon, Trash2, Plus } from 'lucide-react';
 
 interface PropertiesPanelProps {
   mapData: GameMap;
@@ -44,6 +45,44 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       const num = parseInt(value, 10);
       if (isNaN(num) || num < 100) return;
       onTestConfigChange({ ...testConfig, [key]: num });
+  };
+
+  // Background Image Handlers
+  const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+          const result = ev.target?.result as string;
+          // Replace current or set new
+          onUpdateMap({
+              backgroundImage: {
+                  data: result,
+                  name: file.name,
+                  opacity: 0.5, // Default 50%
+                  scale: 1.0,
+              }
+          });
+      };
+      reader.readAsDataURL(file);
+  };
+
+  const handleBgPropertyChange = (key: 'opacity' | 'scale', value: string) => {
+      if (!mapData.backgroundImage) return;
+      const num = parseFloat(value);
+      if (isNaN(num)) return;
+      
+      onUpdateMap({
+          backgroundImage: {
+              ...mapData.backgroundImage,
+              [key]: num
+          }
+      });
+  };
+
+  const handleRemoveBgImage = () => {
+      onUpdateMap({ backgroundImage: undefined });
   };
 
   return (
@@ -105,20 +144,99 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
       </div>
 
-      {/* Background Color */}
+      {/* Background Settings */}
       <div className="bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700">
-          <label className="flex items-center gap-2 text-xs font-semibold text-gray-300 mb-2">
-                <Palette size={14} />
-                Background Color
-          </label>
-          <div className="flex gap-2 items-center bg-gray-900 p-2 rounded border border-gray-600">
-                <input
-                    type="color"
-                    value={mapData.backgroundColor || '#5C94FC'}
-                    onChange={(e) => onBackgroundColorChange(e.target.value)}
-                    className="h-6 w-8 bg-transparent cursor-pointer border-0 p-0 rounded overflow-hidden"
-                />
-                <span className="text-xs font-mono text-gray-400 uppercase">{mapData.backgroundColor}</span>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">Background</h3>
+          
+          {/* Color Picker */}
+          <div className="mb-4">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-400 mb-2">
+                    <Palette size={14} />
+                    Solid Color
+              </label>
+              <div className="flex gap-2 items-center bg-gray-900 p-2 rounded border border-gray-600">
+                    <input
+                        type="color"
+                        value={mapData.backgroundColor || '#5C94FC'}
+                        onChange={(e) => onBackgroundColorChange(e.target.value)}
+                        className="h-6 w-8 bg-transparent cursor-pointer border-0 p-0 rounded overflow-hidden"
+                    />
+                    <span className="text-xs font-mono text-gray-400 uppercase">{mapData.backgroundColor}</span>
+              </div>
+          </div>
+
+          {/* Image Upload */}
+          <div>
+              <div className="flex justify-between items-center mb-2">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-400">
+                        <ImageIcon size={14} />
+                        Texture Image
+                  </label>
+              </div>
+              
+              {!mapData.backgroundImage ? (
+                  <label className="flex flex-col items-center justify-center w-full h-20 bg-gray-900 border-2 border-dashed border-gray-600 rounded cursor-pointer hover:border-gray-400 hover:bg-gray-800 transition-colors">
+                      <span className="text-xs text-gray-500 flex items-center gap-1"><Plus size={12}/> Upload Image</span>
+                      <input type="file" accept="image/*" onChange={handleBgImageUpload} className="hidden" />
+                  </label>
+              ) : (
+                  <div className="space-y-3 bg-gray-900 p-2 rounded border border-gray-600">
+                      <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                              <div className="w-8 h-8 rounded bg-gray-800 flex-shrink-0 overflow-hidden border border-gray-600">
+                                  <img src={mapData.backgroundImage.data} alt="Bg" className="w-full h-full object-cover" />
+                              </div>
+                              <span className="text-[10px] text-gray-400 truncate max-w-[100px]" title={mapData.backgroundImage.name}>
+                                  {mapData.backgroundImage.name}
+                              </span>
+                          </div>
+                          <button 
+                            onClick={handleRemoveBgImage}
+                            className="text-red-400 hover:text-red-300 p-1 hover:bg-gray-800 rounded"
+                            title="Remove Image"
+                          >
+                              <Trash2 size={14} />
+                          </button>
+                      </div>
+
+                      <div>
+                          <div className="flex justify-between mb-1">
+                              <span className="text-[10px] text-gray-400">Opacity</span>
+                              <span className="text-[10px] text-white">{Math.round(mapData.backgroundImage.opacity * 100)}%</span>
+                          </div>
+                          <input 
+                              type="range" 
+                              min="0" 
+                              max="1" 
+                              step="0.05"
+                              value={mapData.backgroundImage.opacity}
+                              onChange={(e) => handleBgPropertyChange('opacity', e.target.value)}
+                              className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                          />
+                      </div>
+
+                      <div>
+                          <div className="flex justify-between mb-1">
+                              <span className="text-[10px] text-gray-400">Scale</span>
+                              <span className="text-[10px] text-white">{mapData.backgroundImage.scale}x</span>
+                          </div>
+                          <input 
+                              type="number" 
+                              min="0.1" 
+                              max="10" 
+                              step="0.1"
+                              value={mapData.backgroundImage.scale}
+                              onChange={(e) => handleBgPropertyChange('scale', e.target.value)}
+                              className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+                          />
+                      </div>
+                      
+                      <label className="block w-full text-center text-[10px] text-blue-400 cursor-pointer hover:underline mt-1 pt-2 border-t border-gray-700">
+                          Replace Image
+                          <input type="file" accept="image/*" onChange={handleBgImageUpload} className="hidden" />
+                      </label>
+                  </div>
+              )}
           </div>
       </div>
 

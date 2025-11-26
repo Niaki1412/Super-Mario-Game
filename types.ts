@@ -5,8 +5,16 @@ export interface GameMap {
   height: number; // Height in tiles
   tileSize: number; // Pixels per tile
   backgroundColor: string;
+  backgroundImage?: BackgroundImage; // New field for custom texture
   tiles: number[][]; // 2D array of Tile IDs (0 = empty)
   objects: GameObjectData[]; // Array of entities
+}
+
+export interface BackgroundImage {
+    data: string; // Base64 string
+    name: string; // File name for reference
+    opacity: number; // 0-1
+    scale: number; // Multiplier
 }
 
 // Configuration for a specific type of game element
