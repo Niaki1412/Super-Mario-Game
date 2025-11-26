@@ -65,7 +65,7 @@ export const Game: React.FC<GameProps> = ({
 
   // --- HELPERS ---
 
-  const checkRectCollision = (r1: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}) => {
+  const checkRectCollision = (r1: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}) => {
     return (
         r1.x < r2.x + r2.w &&
         r1.x + r1.w > r2.x &&
@@ -1094,16 +1094,13 @@ export const Game: React.FC<GameProps> = ({
     reader.readAsText(file);
   };
 
-  const handleLoadFromApi = async (id: number, isPublic = false) => {
+  const handleLoadFromApi = async (id: number) => {
       const token = localStorage.getItem('access_token');
-      if (!token && !isPublic) {
+      if (!token) {
           alert("Please login to play cloud maps");
           return;
       }
       try {
-          // For public map list, the ID passed might be the primary key, but we need the map_id reference
-          // The logic in GameCenter passes the correct map_id.
-          // Also allow fetching without token if public
           const mapData = await getMapById(id, token);
           if (mapData.map_data) {
               // Ensure we parse the string back to JSON
