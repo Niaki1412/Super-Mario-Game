@@ -8,9 +8,16 @@ import { GameMap, GameObjectData } from '../../types';
 import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE as DEFAULT_TILE_SIZE, TOOL_ERASER } from '../../constants';
 import { getElementById } from '../../elementRegistry';
 import { saveMap, getMapById, MapIn } from '../../api';
-import { X } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, Cloud } from 'lucide-react';
 
 const STORAGE_KEY = 'MARIO_MAP_DATA';
+
+// Toast Notification Type
+interface ToastState {
+  id: number;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 export const Editor: React.FC = () => {
   const navigate = useNavigate();
@@ -23,6 +30,9 @@ export const Editor: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isPlayTesting, setIsPlayTesting] = useState(false);
   
+  // Notification State
+  const [toast, setToast] = useState<ToastState | null>(null);
+
   // Play Test Configuration
   const [testConfig, setTestConfig] = useState({ width: 800, height: 600 });
 
@@ -34,6 +44,16 @@ export const Editor: React.FC = () => {
     tiles: Array(DEFAULT_MAP_HEIGHT).fill(null).map(() => Array(DEFAULT_MAP_WIDTH).fill(0)),
     objects: []
   });
+
+  // Helper to show toast
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+      const id = Date.now();
+      setToast({ id, message, type });
+      // Auto hide after 3 seconds
+      setTimeout(() => {
+          setToast(current => current?.id === id ? null : current);
+      }, 3500);
+  };
 
   // --- Init ---
   useEffect(() => {
@@ -54,11 +74,12 @@ export const Editor: React.FC = () => {
                          const json = typeof cloudMap.map_data === 'string' ? JSON.parse(cloudMap.map_data) : cloudMap.map_data;
                          setMapData(json);
                          setLastSaved(new Date()); // Mark as fresh
+                         showToast(`Map #${mapIdParam} loaded from cloud`, 'info');
                          return; // Loaded successfully, skip local storage
                     }
                 } catch (e) {
                     console.error("Failed to load map from cloud ID", e);
-                    alert("Failed to load map from cloud. Check console.");
+                    showToast("Failed to load map from cloud", 'error');
                 }
             }
         }
@@ -94,15 +115,16 @@ export const Editor: React.FC = () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       setLastSaved(now);
+      showToast("Map saved to local storage!", 'success');
     } catch (e) {
-      alert("Failed to save to local storage (quota might be full).");
+      showToast("Failed to save (Storage full?)", 'error');
     }
   };
 
   const handleCloudSave = async () => {
       const token = localStorage.getItem('access_token');
       if (!token) {
-          alert("Please login to save maps to the cloud.");
+          showToast("Please login to save to cloud", 'error');
           return;
       }
 
@@ -114,6 +136,9 @@ export const Editor: React.FC = () => {
           is_public: false
       };
 
+      // Immediate feedback for async action
+      showToast("Saving to cloud...", 'info');
+
       try {
           const response = await saveMap(payload, token);
           
@@ -122,14 +147,14 @@ export const Editor: React.FC = () => {
           // If we created a new map, update the URL so subsequent saves are updates
           if (!idToSave && response.map_id) {
               setSearchParams({ id: response.map_id.toString() });
-              alert(`Map saved to cloud! ID: ${response.map_id}`);
+              showToast(`Map created! ID: ${response.map_id}`, 'success');
           } else {
-              alert("Map updated in cloud!");
+              showToast("Cloud save successful!", 'success');
           }
 
       } catch (e: any) {
           console.error(e);
-          alert(`Cloud save failed: ${e.message}`);
+          showToast(e.message || "Cloud save failed", 'error');
       }
   };
 
@@ -242,8 +267,6 @@ export const Editor: React.FC = () => {
         tiles: Array(prev.height).fill(null).map(() => Array(prev.width).fill(0)),
         objects: []
       }));
-      // Optional: Clear ID from URL if starting fresh? 
-      // setSearchParams({});
     }
   };
 
@@ -256,6 +279,7 @@ export const Editor: React.FC = () => {
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
+    showToast("Map exported to file", 'success');
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,8 +293,9 @@ export const Editor: React.FC = () => {
         setMapData(json);
         const nameWithoutExt = file.name.replace(/\.json$/i, "");
         setMapName(nameWithoutExt);
+        showToast("Map imported successfully", 'success');
       } catch (err) {
-        alert("Invalid JSON file");
+        showToast("Invalid JSON file", 'error');
       }
     };
     reader.readAsText(file);
@@ -278,6 +303,23 @@ export const Editor: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen bg-gray-950 text-white font-sans relative">
+      {/* Toast Notification Layer */}
+      {toast && (
+          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className={`
+                  flex items-center gap-3 px-6 py-3 rounded-full shadow-2xl border border-white/10 backdrop-blur-md
+                  ${toast.type === 'success' ? 'bg-green-900/80 text-green-100' : 
+                    toast.type === 'error' ? 'bg-red-900/80 text-red-100' : 
+                    'bg-blue-900/80 text-blue-100'}
+              `}>
+                  {toast.type === 'success' && <CheckCircle size={20} className="text-green-400" />}
+                  {toast.type === 'error' && <AlertTriangle size={20} className="text-red-400" />}
+                  {toast.type === 'info' && <Cloud size={20} className="text-blue-400" />}
+                  <span className="font-semibold text-sm">{toast.message}</span>
+              </div>
+          </div>
+      )}
+
       {/* Left: Palette */}
       <AssetPalette 
         selectedId={selectedElementId} 
@@ -288,12 +330,12 @@ export const Editor: React.FC = () => {
       {/* Center: Canvas */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
           <div className="absolute top-4 left-4 z-50">
-             <button onClick={() => navigate('/')} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded shadow border border-gray-600">
-                ← Back to Menu
+             <button onClick={() => navigate('/')} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded shadow border border-gray-600 flex items-center gap-2">
+                <span>←</span> <span className="text-sm font-bold">Menu</span>
              </button>
              {mapIdParam && (
-                 <span className="ml-4 bg-blue-900/50 text-blue-200 px-2 py-1 rounded text-xs border border-blue-800">
-                     Editing Map #{mapIdParam}
+                 <span className="ml-4 bg-blue-900/50 text-blue-200 px-3 py-1.5 rounded text-xs border border-blue-800 font-mono shadow-sm">
+                     ID: {mapIdParam}
                  </span>
              )}
           </div>
@@ -324,7 +366,7 @@ export const Editor: React.FC = () => {
 
       {/* Play Test Modal */}
       {isPlayTesting && (
-          <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center backdrop-blur-sm p-4">
+          <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center backdrop-blur-sm p-4 animate-in fade-in duration-200">
               <div 
                 className="relative bg-black border-4 border-gray-700 rounded-lg shadow-2xl overflow-hidden flex flex-col" 
                 style={{ width: `${testConfig.width}px`, height: `${testConfig.height}px` }}
@@ -332,7 +374,7 @@ export const Editor: React.FC = () => {
                   {/* Close Button */}
                   <button 
                     onClick={() => setIsPlayTesting(false)}
-                    className="absolute top-2 right-2 z-50 bg-red-600 hover:bg-red-500 text-white p-1 rounded-full shadow-lg"
+                    className="absolute top-2 right-2 z-50 bg-red-600 hover:bg-red-500 text-white p-1 rounded-full shadow-lg transition-transform hover:scale-110"
                     title="Close Game"
                   >
                       <X size={24} />

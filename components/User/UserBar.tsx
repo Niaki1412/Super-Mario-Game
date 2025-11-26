@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, LogOut, LogIn, UserPlus, X, Mail, Hash } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, LogOut, LogIn, UserPlus, X, Mail, Hash, ChevronDown } from 'lucide-react';
 import { loginUser, registerUser, logoutUser, getUserProfile, UserOut } from '../../api';
 
 export const UserBar: React.FC = () => {
@@ -8,7 +8,7 @@ export const UserBar: React.FC = () => {
   // Modal Visibility States
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [showProfilePopover, setShowProfilePopover] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +16,10 @@ export const UserBar: React.FC = () => {
   // Data States
   const [formData, setFormData] = useState({ username: '', password: '', mail: '' });
   const [profileData, setProfileData] = useState<UserOut | null>(null);
+
+  // Refs for click outside
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // Check local storage on mount
@@ -26,6 +30,24 @@ export const UserBar: React.FC = () => {
     }
   }, []);
 
+  // Click Outside Handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        showProfilePopover &&
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setShowProfilePopover(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfilePopover]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -35,7 +57,7 @@ export const UserBar: React.FC = () => {
     setError(null);
     setShowLogin(false);
     setShowRegister(false);
-    setShowProfile(false);
+    setShowProfilePopover(false);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -61,11 +83,10 @@ export const UserBar: React.FC = () => {
     setError(null);
     try {
       await registerUser({ username: formData.username, password: formData.password, mail: formData.mail });
-      // Auto login after register? Or just switch to login
       alert('Registration successful! Please login.');
       setShowRegister(false);
       setShowLogin(true);
-      setFormData(prev => ({ ...prev, password: '' })); // Keep username/mail
+      setFormData(prev => ({ ...prev, password: '' })); 
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -82,16 +103,23 @@ export const UserBar: React.FC = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('username');
     setUser(null);
-    setShowProfile(false);
+    setShowProfilePopover(false);
   };
 
-  const handleShowProfile = async () => {
+  const toggleProfile = async () => {
+      if (showProfilePopover) {
+          setShowProfilePopover(false);
+          return;
+      }
+
       if (!user?.token) return;
+      
+      // Load data and show
       setIsLoading(true);
+      setShowProfilePopover(true); // Show immediately with loading state
       try {
           const data = await getUserProfile(user.token);
           setProfileData(data);
-          setShowProfile(true);
       } catch (err) {
           console.error("Failed to load profile", err);
       } finally {
@@ -101,25 +129,94 @@ export const UserBar: React.FC = () => {
 
   return (
     <>
-      {/* Top Right Bar */}
-      <div className="fixed top-4 right-4 z-[100] flex items-center gap-4">
+      {/* Top Right Bar Container */}
+      <div className="fixed top-4 right-4 z-[100] flex flex-col items-end">
         {user ? (
-          <div className="flex items-center gap-3 bg-gray-800/90 backdrop-blur border border-gray-600 rounded-full px-4 py-2 shadow-lg transition-colors hover:border-gray-500">
-            <button 
-                onClick={handleShowProfile}
-                className="flex items-center gap-2 text-blue-400 hover:text-blue-300 outline-none"
-            >
-              <User size={18} />
-              <span className="font-bold text-sm max-w-[100px] truncate">{user.username}</span>
-            </button>
-            <div className="h-4 w-px bg-gray-600"></div>
-            <button 
-              onClick={handleLogout}
-              className="text-gray-400 hover:text-red-400 transition-colors"
-              title="Logout"
-            >
-              <LogOut size={18} />
-            </button>
+          <div className="relative">
+              {/* User Trigger Button */}
+              <button 
+                  ref={buttonRef}
+                  onClick={toggleProfile}
+                  className={`
+                    flex items-center gap-3 bg-gray-800/90 backdrop-blur border rounded-full px-4 py-2 shadow-lg transition-all
+                    ${showProfilePopover ? 'border-blue-500 bg-gray-700' : 'border-gray-600 hover:border-gray-500'}
+                  `}
+              >
+                <div className="bg-blue-600 rounded-full p-1">
+                    <User size={14} className="text-white" />
+                </div>
+                <span className="font-bold text-sm max-w-[100px] truncate text-white">{user.username}</span>
+                <ChevronDown size={14} className={`text-gray-400 transition-transform ${showProfilePopover ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Profile Popover (Google Style) */}
+              {showProfilePopover && (
+                  <div 
+                    ref={popoverRef}
+                    className="absolute top-full right-0 mt-3 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right ring-1 ring-black/5"
+                  >
+                      {/* Header Pattern */}
+                      <div className="h-16 bg-gradient-to-r from-blue-600 to-blue-400"></div>
+                      
+                      {/* Avatar & Basic Info */}
+                      <div className="px-6 relative">
+                          <div className="absolute -top-10 left-1/2 -translate-x-1/2">
+                              <div className="w-20 h-20 bg-gray-800 rounded-full p-1.5 flex items-center justify-center shadow-md">
+                                  <div className="w-full h-full bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                                      {user.username.charAt(0).toUpperCase()}
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div className="mt-12 text-center pb-6 border-b border-gray-700">
+                              <h3 className="text-lg font-bold text-white">{user.username}</h3>
+                              <p className="text-sm text-gray-400 truncate">{profileData?.mail || user.username}</p>
+                          </div>
+                      </div>
+
+                      {/* Details List */}
+                      <div className="p-4 space-y-1">
+                          {isLoading ? (
+                              <div className="text-center py-4 text-gray-500 text-sm">Syncing profile...</div>
+                          ) : profileData ? (
+                            <>
+                              <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors group cursor-default">
+                                  <div className="bg-gray-700 p-2 rounded text-gray-400 group-hover:text-white group-hover:bg-gray-600">
+                                      <Hash size={16} />
+                                  </div>
+                                  <div>
+                                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">User ID</p>
+                                      <p className="text-sm text-gray-200 font-mono">#{profileData.id}</p>
+                                  </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors group cursor-default">
+                                  <div className="bg-gray-700 p-2 rounded text-gray-400 group-hover:text-white group-hover:bg-gray-600">
+                                      <Mail size={16} />
+                                  </div>
+                                  <div>
+                                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Email</p>
+                                      <p className="text-sm text-gray-200 truncate max-w-[180px]">{profileData.mail}</p>
+                                  </div>
+                              </div>
+                            </>
+                          ) : (
+                             <div className="text-center py-4 text-red-400 text-sm">Failed to load details.</div>
+                          )}
+                      </div>
+
+                      {/* Footer / Actions */}
+                      <div className="bg-gray-900/50 p-4 border-t border-gray-700">
+                          <button 
+                              onClick={handleLogout}
+                              className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-red-600 text-white font-medium py-2 rounded-lg transition-colors text-sm"
+                          >
+                              <LogOut size={16} />
+                              Sign out
+                          </button>
+                      </div>
+                  </div>
+              )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -141,8 +238,8 @@ export const UserBar: React.FC = () => {
         )}
       </div>
 
-      {/* Modals */}
-      {(showLogin || showRegister || showProfile) && (
+      {/* Login / Register Modals (Centered Overlay) */}
+      {(showLogin || showRegister) && (
         <div className="fixed inset-0 z-[101] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden relative animate-fade-in-up">
             <button 
@@ -152,139 +249,81 @@ export const UserBar: React.FC = () => {
               <X size={20} />
             </button>
             
-            {showProfile ? (
-                 // --- PROFILE MODAL ---
-                 <div className="p-6">
-                     <h2 className="text-2xl font-bold text-white mb-6 text-center flex items-center justify-center gap-2">
-                         <User size={28} className="text-blue-500" />
-                         User Profile
-                     </h2>
-                     
-                     {isLoading ? (
-                         <div className="text-center text-gray-400 py-8">Loading profile...</div>
-                     ) : profileData ? (
-                         <div className="space-y-6">
-                             <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
-                                 <div className="flex items-center gap-3">
-                                     <div className="bg-gray-700 p-2 rounded-full text-gray-300">
-                                        <Hash size={18} />
-                                     </div>
-                                     <div>
-                                         <p className="text-xs text-gray-500 uppercase font-bold">User ID</p>
-                                         <p className="text-white font-mono">{profileData.id}</p>
-                                     </div>
-                                 </div>
-                                 
-                                 <div className="flex items-center gap-3">
-                                     <div className="bg-gray-700 p-2 rounded-full text-gray-300">
-                                        <User size={18} />
-                                     </div>
-                                     <div>
-                                         <p className="text-xs text-gray-500 uppercase font-bold">Username</p>
-                                         <p className="text-white font-medium">{profileData.username}</p>
-                                     </div>
-                                 </div>
-
-                                 <div className="flex items-center gap-3">
-                                     <div className="bg-gray-700 p-2 rounded-full text-gray-300">
-                                        <Mail size={18} />
-                                     </div>
-                                     <div>
-                                         <p className="text-xs text-gray-500 uppercase font-bold">Email</p>
-                                         <p className="text-white font-medium break-all">{profileData.mail}</p>
-                                     </div>
-                                 </div>
-                             </div>
-
-                             <button 
-                                onClick={handleLogout}
-                                className="w-full bg-red-900/30 hover:bg-red-900/50 text-red-200 font-bold py-2 rounded border border-red-900/50 transition-colors flex items-center justify-center gap-2"
-                             >
-                                 <LogOut size={16} /> Logout
-                             </button>
-                         </div>
-                     ) : (
-                         <div className="text-center text-red-400">Failed to load profile.</div>
-                     )}
-                 </div>
-            ) : (
-                // --- LOGIN / REGISTER MODAL ---
-                <div className="p-6">
-                  <h2 className="text-2xl font-bold text-white mb-6 text-center">
-                    {showLogin ? 'Welcome Back' : 'Create Account'}
-                  </h2>
-                  
-                  {error && (
-                    <div className="bg-red-500/20 border border-red-500 text-red-200 text-xs p-3 rounded mb-4">
-                      {error}
-                    </div>
-                  )}
-
-                  <form onSubmit={showLogin ? handleLogin : handleRegister} className="space-y-4">
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">Username</label>
-                      <input
-                        name="username"
-                        type="text"
-                        required
-                        value={formData.username}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
-                      />
-                    </div>
-                    
-                    {!showLogin && (
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Email</label>
-                        <input
-                          name="mail"
-                          type="email"
-                          required
-                          value={formData.mail}
-                          onChange={handleInputChange}
-                          className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1">Password</label>
-                      <input
-                        name="password"
-                        type="password"
-                        required
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded mt-4 transition-colors disabled:opacity-50"
-                    >
-                      {isLoading ? 'Processing...' : (showLogin ? 'Login' : 'Sign Up')}
-                    </button>
-                  </form>
-
-                  <div className="mt-4 text-center">
-                    <p className="text-xs text-gray-400">
-                      {showLogin ? "Don't have an account? " : "Already have an account? "}
-                      <button 
-                        onClick={() => { 
-                            setError(null); 
-                            if(showLogin) { setShowLogin(false); setShowRegister(true); }
-                            else { setShowRegister(false); setShowLogin(true); }
-                        }}
-                        className="text-blue-400 hover:text-blue-300 font-bold underline"
-                      >
-                        {showLogin ? 'Register' : 'Login'}
-                      </button>
-                    </p>
-                  </div>
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-white mb-6 text-center">
+                {showLogin ? 'Welcome Back' : 'Create Account'}
+              </h2>
+              
+              {error && (
+                <div className="bg-red-500/20 border border-red-500 text-red-200 text-xs p-3 rounded mb-4">
+                  {error}
                 </div>
-            )}
+              )}
+
+              <form onSubmit={showLogin ? handleLogin : handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Username</label>
+                  <input
+                    name="username"
+                    type="text"
+                    required
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                
+                {!showLogin && (
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Email</label>
+                    <input
+                      name="mail"
+                      type="email"
+                      required
+                      value={formData.mail}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Password</label>
+                  <input
+                    name="password"
+                    type="password"
+                    required
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded mt-4 transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? 'Processing...' : (showLogin ? 'Login' : 'Sign Up')}
+                </button>
+              </form>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-gray-400">
+                  {showLogin ? "Don't have an account? " : "Already have an account? "}
+                  <button 
+                    onClick={() => { 
+                        setError(null); 
+                        if(showLogin) { setShowLogin(false); setShowRegister(true); }
+                        else { setShowRegister(false); setShowLogin(true); }
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-bold underline"
+                  >
+                    {showLogin ? 'Register' : 'Login'}
+                  </button>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
