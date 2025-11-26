@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AssetPalette } from './AssetPalette';
@@ -8,16 +9,19 @@ import { GameMap, GameObjectData } from '../../types';
 import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE as DEFAULT_TILE_SIZE, TOOL_ERASER } from '../../constants';
 import { getElementById } from '../../elementRegistry';
 import { saveMap, getMapById, MapIn } from '../../api';
-import { X, CheckCircle, AlertTriangle, Cloud } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, Cloud, Loader2, Check, XCircle } from 'lucide-react';
 
 const STORAGE_KEY = 'MARIO_MAP_DATA';
 
-// Toast Notification Type
+// Toast Notification Type (Still used for simple actions like Local Save/Export)
 interface ToastState {
   id: number;
   message: string;
   type: 'success' | 'error' | 'info';
 }
+
+// Cloud Save Status State
+type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
 export const Editor: React.FC = () => {
   const navigate = useNavigate();
@@ -25,13 +29,15 @@ export const Editor: React.FC = () => {
   const mapIdParam = searchParams.get('id');
 
   // --- State ---
-  const [selectedElementId, setSelectedElementId] = useState<number | string | null>(1); // Default to Ground
+  const [selectedElementId, setSelectedElementId] = useState<number | string | null>(1);
   const [mapName, setMapName] = useState("my_mario_map");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isPlayTesting, setIsPlayTesting] = useState(false);
   
-  // Notification State
+  // Notifications
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string>("");
 
   // Play Test Configuration
   const [testConfig, setTestConfig] = useState({ width: 800, height: 600 });
@@ -40,7 +46,7 @@ export const Editor: React.FC = () => {
     width: DEFAULT_MAP_WIDTH,
     height: DEFAULT_MAP_HEIGHT,
     tileSize: DEFAULT_TILE_SIZE,
-    backgroundColor: '#5C94FC', // Classic blue sky
+    backgroundColor: '#5C94FC', 
     tiles: Array(DEFAULT_MAP_HEIGHT).fill(null).map(() => Array(DEFAULT_MAP_WIDTH).fill(0)),
     objects: []
   });
@@ -49,7 +55,6 @@ export const Editor: React.FC = () => {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
       const id = Date.now();
       setToast({ id, message, type });
-      // Auto hide after 3 seconds
       setTimeout(() => {
           setToast(current => current?.id === id ? null : current);
       }, 3500);
@@ -57,14 +62,12 @@ export const Editor: React.FC = () => {
 
   // --- Init ---
   useEffect(() => {
-    // Initialize Test Config to 90% of screen
     setTestConfig({
         width: Math.floor(window.innerWidth * 0.9),
         height: Math.floor(window.innerHeight * 0.9)
     });
 
     const initializeMap = async () => {
-        // 1. If ID in URL, try to load from Cloud
         if (mapIdParam) {
             const token = localStorage.getItem('access_token');
             if (token) {
@@ -73,9 +76,9 @@ export const Editor: React.FC = () => {
                     if (cloudMap && cloudMap.map_data) {
                          const json = typeof cloudMap.map_data === 'string' ? JSON.parse(cloudMap.map_data) : cloudMap.map_data;
                          setMapData(json);
-                         setLastSaved(new Date()); // Mark as fresh
+                         setLastSaved(new Date());
                          showToast(`Map #${mapIdParam} loaded from cloud`, 'info');
-                         return; // Loaded successfully, skip local storage
+                         return; 
                     }
                 } catch (e) {
                     console.error("Failed to load map from cloud ID", e);
@@ -84,7 +87,6 @@ export const Editor: React.FC = () => {
             }
         }
 
-        // 2. Fallback to Local Storage if no ID or load failed
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
@@ -128,6 +130,9 @@ export const Editor: React.FC = () => {
           return;
       }
 
+      setSaveStatus('saving');
+      setSaveErrorMessage("");
+
       const idToSave = mapIdParam ? Number(mapIdParam) : null;
       
       const payload: MapIn = {
@@ -136,39 +141,42 @@ export const Editor: React.FC = () => {
           is_public: false
       };
 
-      // Immediate feedback for async action
-      showToast("Saving to cloud...", 'info');
-
       try {
-          const response = await saveMap(payload, token);
+          // Artificial delay for effect (min 800ms)
+          const [response] = await Promise.all([
+              saveMap(payload, token),
+              new Promise(resolve => setTimeout(resolve, 1000))
+          ]);
           
           setLastSaved(new Date());
           
-          // If we created a new map, update the URL so subsequent saves are updates
           if (!idToSave && response.map_id) {
               setSearchParams({ id: response.map_id.toString() });
-              showToast(`Map created! ID: ${response.map_id}`, 'success');
-          } else {
-              showToast("Cloud save successful!", 'success');
           }
+          
+          setSaveStatus('success');
+          
+          // Auto close success modal
+          setTimeout(() => {
+              setSaveStatus('idle');
+          }, 1500);
 
       } catch (e: any) {
           console.error(e);
-          showToast(e.message || "Cloud save failed", 'error');
+          setSaveStatus('error');
+          setSaveErrorMessage(e.message || "Cloud save failed");
       }
   };
 
   const handlePlayTest = () => {
-      handleSaveToStorage(); // Auto-save local before playing
+      handleSaveToStorage();
       setIsPlayTesting(true);
   };
 
-  // Update map properties (width/height) while preserving data
   const handleUpdateMap = (newData: Partial<GameMap>) => {
     setMapData((prev) => {
       let updated = { ...prev, ...newData };
 
-      // Handle Tile Size Scaling Logic
       if (newData.tileSize !== undefined && newData.tileSize !== prev.tileSize) {
           const scale = newData.tileSize / prev.tileSize;
           updated.objects = prev.objects.map(obj => ({
@@ -178,7 +186,6 @@ export const Editor: React.FC = () => {
           }));
       }
 
-      // If dimensions changed, resize the tiles array safely
       if (newData.width !== undefined || newData.height !== undefined) {
         const newW = newData.width ?? prev.width;
         const newH = newData.height ?? prev.height;
@@ -201,10 +208,8 @@ export const Editor: React.FC = () => {
   const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean, isDrag: boolean) => {
     if (x < 0 || y < 0 || x >= mapData.width || y >= mapData.height) return;
     
-    // Use the CURRENT tile size from mapData
     const currentTileSize = mapData.tileSize;
 
-    // Erase Logic
     if (isRightClick || selectedElementId === TOOL_ERASER) {
       const newTiles = [...mapData.tiles];
       newTiles[y] = [...newTiles[y]];
@@ -220,7 +225,6 @@ export const Editor: React.FC = () => {
       return;
     }
 
-    // Paint Logic
     if (selectedElementId === null) return;
     const element = getElementById(selectedElementId);
     if (!element) return;
@@ -303,9 +307,11 @@ export const Editor: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen bg-gray-950 text-white font-sans relative">
-      {/* Toast Notification Layer */}
+      {/* --- MODALS & OVERLAYS --- */}
+
+      {/* Toast Notification (Local Actions) */}
       {toast && (
-          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
               <div className={`
                   flex items-center gap-3 px-6 py-3 rounded-full shadow-2xl border border-white/10 backdrop-blur-md
                   ${toast.type === 'success' ? 'bg-green-900/80 text-green-100' : 
@@ -317,6 +323,58 @@ export const Editor: React.FC = () => {
                   {toast.type === 'info' && <Cloud size={20} className="text-blue-400" />}
                   <span className="font-semibold text-sm">{toast.message}</span>
               </div>
+          </div>
+      )}
+
+      {/* Cloud Save Modal Overlay */}
+      {saveStatus !== 'idle' && (
+          <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200">
+             <div className="bg-gray-800 border border-gray-700 p-10 rounded-3xl shadow-2xl flex flex-col items-center justify-center min-w-[300px] min-h-[250px] animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+                
+                {saveStatus === 'saving' && (
+                    <>
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+                            <Loader2 className="w-20 h-20 text-blue-500 animate-spin relative z-10" strokeWidth={1.5} />
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Syncing...</h3>
+                        <p className="text-gray-400">Uploading map data to cloud</p>
+                    </>
+                )}
+
+                {saveStatus === 'success' && (
+                    <>
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-green-500/20 rounded-full blur-xl animate-pulse"></div>
+                            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-lg scale-100 animate-in zoom-in duration-300">
+                                <Check className="w-12 h-12 text-white" strokeWidth={3} />
+                            </div>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Saved!</h3>
+                        <p className="text-gray-400">Your map is safe in the cloud.</p>
+                    </>
+                )}
+
+                {saveStatus === 'error' && (
+                    <>
+                        <div className="relative mb-6">
+                            <div className="absolute inset-0 bg-red-500/20 rounded-full blur-xl"></div>
+                            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border-2 border-red-500 shadow-lg">
+                                <XCircle className="w-12 h-12 text-red-500" />
+                            </div>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">Save Failed</h3>
+                        <p className="text-red-300 text-center text-sm max-w-[250px] mb-6">{saveErrorMessage}</p>
+                        <button 
+                            onClick={() => setSaveStatus('idle')}
+                            className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-full font-bold transition-colors"
+                        >
+                            Close
+                        </button>
+                    </>
+                )}
+
+             </div>
           </div>
       )}
 
@@ -371,7 +429,6 @@ export const Editor: React.FC = () => {
                 className="relative bg-black border-4 border-gray-700 rounded-lg shadow-2xl overflow-hidden flex flex-col" 
                 style={{ width: `${testConfig.width}px`, height: `${testConfig.height}px` }}
               >
-                  {/* Close Button */}
                   <button 
                     onClick={() => setIsPlayTesting(false)}
                     className="absolute top-2 right-2 z-50 bg-red-600 hover:bg-red-500 text-white p-1 rounded-full shadow-lg transition-transform hover:scale-110"
