@@ -114,13 +114,14 @@ export const logoutUser = async (token: string): Promise<void> => {
   });
 };
 
-export const getUserProfile = async (token: string): Promise<UserOut[]> => {
+export const getUserProfile = async (token: string): Promise<UserOut> => {
   const res = await fetch(`${API_BASE}/profile`, {
     method: 'GET',
     headers: getHeaders(token),
   });
   if (!res.ok) throw new Error('Failed to fetch profile');
-  return res.json();
+  const json = await res.json();
+  return json.data;
 };
 
 // --- Map Endpoints ---
