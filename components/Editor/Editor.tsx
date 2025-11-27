@@ -5,15 +5,15 @@ import { AssetPalette } from './AssetPalette';
 import { PropertiesPanel } from './PropertiesPanel';
 import { MapCanvas } from './MapCanvas';
 import { Game } from '../Game/Game';
-import { GameMap, GameObjectData } from '../../types';
-import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE as DEFAULT_TILE_SIZE, TOOL_ERASER } from '../../constants';
+import { GameMap, GameObjectData, CustomImageDef } from '../../types';
+import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE as DEFAULT_TILE_SIZE, TOOL_ERASER, TOOL_SELECT } from '../../constants';
 import { getElementById } from '../../elementRegistry';
 import { saveMap, getMapById, MapIn } from '../../api';
 import { X, CheckCircle, AlertTriangle, Cloud, Loader2, Check, XCircle } from 'lucide-react';
 
 const STORAGE_KEY = 'MARIO_MAP_DATA';
 
-// Toast Notification Type (Still used for simple actions like Local Save/Export)
+// Toast Notification Type
 interface ToastState {
   id: number;
   message: string;
@@ -34,6 +34,9 @@ export const Editor: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isPlayTesting, setIsPlayTesting] = useState(false);
   
+  // Selection State
+  const [selectedObject, setSelectedObject] = useState<GameObjectData | null>(null);
+
   // Notifications
   const [toast, setToast] = useState<ToastState | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -48,7 +51,8 @@ export const Editor: React.FC = () => {
     tileSize: DEFAULT_TILE_SIZE,
     backgroundColor: '#5C94FC', 
     tiles: Array(DEFAULT_MAP_HEIGHT).fill(null).map(() => Array(DEFAULT_MAP_WIDTH).fill(0)),
-    objects: []
+    objects: [],
+    customImages: []
   });
 
   // Helper to show toast
@@ -75,6 +79,8 @@ export const Editor: React.FC = () => {
                     const cloudMap = await getMapById(Number(mapIdParam), token);
                     if (cloudMap && cloudMap.map_data) {
                          const json = typeof cloudMap.map_data === 'string' ? JSON.parse(cloudMap.map_data) : cloudMap.map_data;
+                         // Ensure customImages is array
+                         if (!json.customImages) json.customImages = [];
                          setMapData(json);
                          setLastSaved(new Date());
                          showToast(`Map #${mapIdParam} loaded from cloud`, 'info');
@@ -92,7 +98,9 @@ export const Editor: React.FC = () => {
             try {
                 const parsed = JSON.parse(saved);
                 if (parsed.mapData) {
-                    setMapData(parsed.mapData);
+                    const data = parsed.mapData;
+                    if (!data.customImages) data.customImages = [];
+                    setMapData(data);
                 }
                 if (parsed.mapName) setMapName(parsed.mapName);
                 if (parsed.lastSaved) setLastSaved(new Date(parsed.lastSaved));
@@ -142,7 +150,6 @@ export const Editor: React.FC = () => {
       };
 
       try {
-          // Artificial delay for effect (min 800ms)
           const [response] = await Promise.all([
               saveMap(payload, token),
               new Promise(resolve => setTimeout(resolve, 1000))
@@ -156,7 +163,6 @@ export const Editor: React.FC = () => {
           
           setSaveStatus('success');
           
-          // Auto close success modal
           setTimeout(() => {
               setSaveStatus('idle');
           }, 1500);
@@ -201,31 +207,118 @@ export const Editor: React.FC = () => {
     });
   };
 
+  const handleUpdateObject = (id: string, newData: Partial<GameObjectData['properties']>) => {
+      setMapData(prev => {
+          const newObjects = prev.objects.map(obj => 
+              obj.id === id ? { ...obj, properties: { ...obj.properties, ...newData } } : obj
+          );
+          // Also update selectedObject state immediately for UI responsiveness
+          const updatedObj = newObjects.find(o => o.id === id);
+          if (updatedObj) setSelectedObject(updatedObj);
+          return { ...prev, objects: newObjects };
+      });
+  };
+
+  const handleDeleteObject = (id: string) => {
+      setMapData(prev => ({
+          ...prev,
+          objects: prev.objects.filter(obj => obj.id !== id)
+      }));
+      if (selectedObject?.id === id) setSelectedObject(null);
+  };
+
   const handleBackgroundColorChange = (color: string) => {
       setMapData(prev => ({ ...prev, backgroundColor: color }));
+  };
+
+  // Image Upload Logic
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      Array.from(files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+              const result = ev.target?.result as string;
+              setMapData(prev => ({
+                  ...prev,
+                  customImages: [
+                      ...(prev.customImages || []),
+                      { id: crypto.randomUUID(), name: file.name, data: result }
+                  ]
+              }));
+          };
+          reader.readAsDataURL(file);
+      });
   };
 
   const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean, isDrag: boolean) => {
     if (x < 0 || y < 0 || x >= mapData.width || y >= mapData.height) return;
     
     const currentTileSize = mapData.tileSize;
+    const pixelX = x * currentTileSize;
+    const pixelY = y * currentTileSize;
 
+    // --- SELECTION LOGIC ---
+    if (selectedElementId === TOOL_SELECT && !isRightClick && !isDrag) {
+        // Find object at this position (simple hit test center)
+        // Reverse iterate to select top-most
+        const clickedObj = [...mapData.objects].reverse().find(o => {
+            const w = o.properties?.width || currentTileSize;
+            const h = o.properties?.height || currentTileSize;
+            
+            // Allow selecting if object covers this tile
+            return (
+                pixelX >= o.x && pixelX < o.x + w &&
+                pixelY >= o.y && pixelY < o.y + h
+            );
+        });
+        
+        setSelectedObject(clickedObj || null);
+        return;
+    }
+
+    // --- ERASER LOGIC ---
     if (isRightClick || selectedElementId === TOOL_ERASER) {
       const newTiles = [...mapData.tiles];
       newTiles[y] = [...newTiles[y]];
       newTiles[y][x] = 0;
 
-      const pixelX = x * currentTileSize;
-      const pixelY = y * currentTileSize;
       const newObjects = mapData.objects.filter(o => 
         !(o.x >= pixelX && o.x < pixelX + currentTileSize && o.y >= pixelY && o.y < pixelY + currentTileSize)
       );
 
       setMapData(prev => ({ ...prev, tiles: newTiles, objects: newObjects }));
+      setSelectedObject(null);
       return;
     }
 
     if (selectedElementId === null) return;
+
+    // --- CUSTOM IMAGE LOGIC ---
+    if (typeof selectedElementId === 'string' && selectedElementId.startsWith('custom_img:')) {
+        const imageId = selectedElementId.replace('custom_img:', '');
+        const imageDef = mapData.customImages.find(img => img.id === imageId);
+        if (!imageDef) return;
+
+        const newObj: GameObjectData = {
+            id: crypto.randomUUID(),
+            type: 'CustomImage',
+            x: pixelX,
+            y: pixelY,
+            properties: {
+                customImageId: imageId,
+                opacity: 1,
+                scale: 1,
+                width: currentTileSize * 2, // Default size 2x2 tiles
+                height: currentTileSize * 2
+            }
+        };
+        setMapData(prev => ({ ...prev, objects: [...prev.objects, newObj] }));
+        return;
+    }
+
+    // --- REGULAR ELEMENT LOGIC ---
     const element = getElementById(selectedElementId);
     if (!element) return;
 
@@ -235,16 +328,12 @@ export const Editor: React.FC = () => {
       newTiles[y][x] = element.id;
       setMapData(prev => ({ ...prev, tiles: newTiles }));
     } else {
-      let textContent: string | undefined = undefined;
-
-      const pixelX = x * currentTileSize;
-      const pixelY = y * currentTileSize;
-      
       const existingObj = mapData.objects.find(o => 
           o.x === pixelX && o.y === pixelY && o.type === element.name
       );
       if (existingObj) return;
 
+      let textContent: string | undefined = undefined;
       if (element.name === 'Text Decoration') {
           if (isDrag) return;
           const input = prompt("Enter a single character:", "A");
@@ -271,6 +360,7 @@ export const Editor: React.FC = () => {
         tiles: Array(prev.height).fill(null).map(() => Array(prev.width).fill(0)),
         objects: []
       }));
+      setSelectedObject(null);
     }
   };
 
@@ -294,6 +384,7 @@ export const Editor: React.FC = () => {
     reader.onload = (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
+        if (!json.customImages) json.customImages = [];
         setMapData(json);
         const nameWithoutExt = file.name.replace(/\.json$/i, "");
         setMapName(nameWithoutExt);
@@ -307,11 +398,16 @@ export const Editor: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen bg-gray-950 text-white font-sans relative">
-      {/* --- MODALS & OVERLAYS --- */}
+      <style>{`
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+        @keyframes zoom-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-zoom-in { animation: zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}</style>
 
-      {/* Toast Notification (Local Actions) */}
+      {/* --- MODALS & OVERLAYS --- */}
       {toast && (
-          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
+          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-fade-in pointer-events-none">
               <div className={`
                   flex items-center gap-3 px-6 py-3 rounded-full shadow-2xl border border-white/10 backdrop-blur-md
                   ${toast.type === 'success' ? 'bg-green-900/80 text-green-100' : 
@@ -326,11 +422,10 @@ export const Editor: React.FC = () => {
           </div>
       )}
 
-      {/* Cloud Save Modal Overlay */}
+      {/* Cloud Save Modal */}
       {saveStatus !== 'idle' && (
-          <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200">
-             <div className="bg-gray-800 border border-gray-700 p-10 rounded-3xl shadow-2xl flex flex-col items-center justify-center min-w-[300px] min-h-[250px] animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
-                
+          <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-fade-in">
+             <div className="bg-gray-800 border border-gray-700 p-10 rounded-3xl shadow-2xl flex flex-col items-center justify-center min-w-[300px] min-h-[250px] animate-zoom-in">
                 {saveStatus === 'saving' && (
                     <>
                         <div className="relative mb-6">
@@ -341,12 +436,11 @@ export const Editor: React.FC = () => {
                         <p className="text-gray-400">Uploading map data to cloud</p>
                     </>
                 )}
-
                 {saveStatus === 'success' && (
                     <>
                         <div className="relative mb-6">
                             <div className="absolute inset-0 bg-green-500/20 rounded-full blur-xl animate-pulse"></div>
-                            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-lg scale-100 animate-in zoom-in duration-300">
+                            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-lg scale-100 animate-zoom-in">
                                 <Check className="w-12 h-12 text-white" strokeWidth={3} />
                             </div>
                         </div>
@@ -354,7 +448,6 @@ export const Editor: React.FC = () => {
                         <p className="text-gray-400">Your map is safe in the cloud.</p>
                     </>
                 )}
-
                 {saveStatus === 'error' && (
                     <>
                         <div className="relative mb-6">
@@ -365,15 +458,9 @@ export const Editor: React.FC = () => {
                         </div>
                         <h3 className="text-2xl font-bold text-white mb-2">Save Failed</h3>
                         <p className="text-red-300 text-center text-sm max-w-[250px] mb-6">{saveErrorMessage}</p>
-                        <button 
-                            onClick={() => setSaveStatus('idle')}
-                            className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-full font-bold transition-colors"
-                        >
-                            Close
-                        </button>
+                        <button onClick={() => setSaveStatus('idle')} className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-full font-bold transition-colors">Close</button>
                     </>
                 )}
-
              </div>
           </div>
       )}
@@ -381,8 +468,10 @@ export const Editor: React.FC = () => {
       {/* Left: Palette */}
       <AssetPalette 
         selectedId={selectedElementId} 
+        customImages={mapData.customImages}
         onSelect={setSelectedElementId} 
         onClearMap={handleClearMap}
+        onUploadImage={handleImageUpload}
       />
 
       {/* Center: Canvas */}
@@ -392,9 +481,7 @@ export const Editor: React.FC = () => {
                 <span>←</span> <span className="text-sm font-bold">Menu</span>
              </button>
              {mapIdParam && (
-                 <span className="ml-4 bg-blue-900/50 text-blue-200 px-3 py-1.5 rounded text-xs border border-blue-800 font-mono shadow-sm">
-                     ID: {mapIdParam}
-                 </span>
+                 <span className="ml-4 bg-blue-900/50 text-blue-200 px-3 py-1.5 rounded text-xs border border-blue-800 font-mono shadow-sm">ID: {mapIdParam}</span>
              )}
           </div>
           <MapCanvas 
@@ -411,9 +498,12 @@ export const Editor: React.FC = () => {
         mapName={mapName}
         lastSaved={lastSaved}
         testConfig={testConfig}
+        selectedObject={selectedObject}
         onTestConfigChange={setTestConfig}
         onMapNameChange={setMapName}
         onUpdateMap={handleUpdateMap}
+        onUpdateObject={handleUpdateObject}
+        onDeleteObject={handleDeleteObject}
         onExport={handleExport}
         onImport={handleImport}
         onSave={handleSaveToStorage}
@@ -424,7 +514,7 @@ export const Editor: React.FC = () => {
 
       {/* Play Test Modal */}
       {isPlayTesting && (
-          <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center backdrop-blur-sm p-4 animate-fade-in">
               <div 
                 className="relative bg-black border-4 border-gray-700 rounded-lg shadow-2xl overflow-hidden flex flex-col" 
                 style={{ width: `${testConfig.width}px`, height: `${testConfig.height}px` }}

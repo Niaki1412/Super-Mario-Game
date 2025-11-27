@@ -5,16 +5,15 @@ export interface GameMap {
   height: number; // Height in tiles
   tileSize: number; // Pixels per tile
   backgroundColor: string;
-  backgroundImage?: BackgroundImage; // New field for custom texture
+  customImages: CustomImageDef[]; // Registry of uploaded images
   tiles: number[][]; // 2D array of Tile IDs (0 = empty)
   objects: GameObjectData[]; // Array of entities
 }
 
-export interface BackgroundImage {
+export interface CustomImageDef {
+    id: string; // uuid
+    name: string;
     data: string; // Base64 string
-    name: string; // File name for reference
-    opacity: number; // 0-1
-    scale: number; // Multiplier
 }
 
 // Configuration for a specific type of game element
@@ -41,11 +40,20 @@ export interface ElementConfig {
 // Instance of an object in the map (JSON data)
 export interface GameObjectData {
   id: string; // Unique instance ID
-  type: string; // References the ElementConfig key/name
+  type: string; // References the ElementConfig key/name OR 'CustomImage'
   x: number; // Pixel X
   y: number; // Pixel Y
   variant?: string;
   text?: string; // Content for Text elements
+  
+  // Instance specific properties
+  properties?: {
+      customImageId?: string; // For CustomImage type
+      opacity?: number;
+      scale?: number;
+      width?: number;
+      height?: number;
+  };
 }
 
 export interface EditorState {
@@ -105,6 +113,11 @@ export interface Entity extends Rect {
 
   // Decoration specific
   text?: string;
+  
+  // Custom Image
+  customImageId?: string;
+  opacity?: number;
+  scale?: number;
 }
 
 export interface Particle {

@@ -1,16 +1,19 @@
 
 import React, { useState } from 'react';
-import { GameMap } from '../../types';
-import { Save, Play, ArrowUpFromLine, ArrowDownToLine, Palette, CloudUpload, Image as ImageIcon, Trash2, Plus, ChevronDown, ChevronRight, Settings, Maximize, BarChart } from 'lucide-react';
+import { GameMap, GameObjectData } from '../../types';
+import { Save, Play, ArrowUpFromLine, ArrowDownToLine, Palette, CloudUpload, Trash2, ChevronDown, ChevronRight, Settings, Maximize, BarChart, BoxSelect, ZoomIn } from 'lucide-react';
 
 interface PropertiesPanelProps {
   mapData: GameMap;
   mapName: string;
   lastSaved: Date | null;
   testConfig: { width: number, height: number };
+  selectedObject: GameObjectData | null;
   onTestConfigChange: (config: { width: number, height: number }) => void;
   onMapNameChange: (name: string) => void;
   onUpdateMap: (newData: Partial<GameMap>) => void;
+  onUpdateObject: (id: string, newData: Partial<GameObjectData['properties']>) => void;
+  onDeleteObject: (id: string) => void;
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSave: () => void;
@@ -26,15 +29,16 @@ const PropertySection: React.FC<{
     isOpen: boolean;
     onToggle: () => void;
     children: React.ReactNode;
-}> = ({ title, icon, isOpen, onToggle, children }) => {
+    highlight?: boolean;
+}> = ({ title, icon, isOpen, onToggle, children, highlight }) => {
     return (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-3">
+        <div className={`rounded-lg border overflow-hidden mb-3 ${highlight ? 'bg-blue-900/20 border-blue-500/50' : 'bg-gray-800 border-gray-700'}`}>
             <button 
                 onClick={onToggle}
-                className="w-full flex items-center justify-between p-3 bg-gray-800 hover:bg-gray-750 transition-colors"
+                className={`w-full flex items-center justify-between p-3 transition-colors ${highlight ? 'hover:bg-blue-900/30' : 'bg-gray-800 hover:bg-gray-750'}`}
             >
-                <div className="flex items-center gap-2 text-sm font-bold text-gray-200">
-                    <span className="text-blue-400">{icon}</span>
+                <div className={`flex items-center gap-2 text-sm font-bold ${highlight ? 'text-blue-300' : 'text-gray-200'}`}>
+                    <span className={highlight ? 'text-blue-400' : 'text-blue-400'}>{icon}</span>
                     {title}
                 </div>
                 {isOpen ? <ChevronDown size={16} className="text-gray-500" /> : <ChevronRight size={16} className="text-gray-500" />}
@@ -54,9 +58,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   mapName,
   lastSaved,
   testConfig,
+  selectedObject,
   onTestConfigChange,
   onMapNameChange,
-  onUpdateMap, 
+  onUpdateMap,
+  onUpdateObject,
+  onDeleteObject,
   onExport,
   onImport,
   onSave,
@@ -67,8 +74,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   
   // Collapsible States
   const [openSections, setOpenSections] = useState({
+      selected: true,
       settings: true,
-      dimensions: true,
+      dimensions: false,
       background: true,
       stats: false
   });
@@ -89,42 +97,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       onTestConfigChange({ ...testConfig, [key]: num });
   };
 
-  // Background Image Handlers
-  const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-          const result = ev.target?.result as string;
-          // Replace current or set new
-          onUpdateMap({
-              backgroundImage: {
-                  data: result,
-                  name: file.name,
-                  opacity: 0.5, // Default 50%
-                  scale: 1.0,
-              }
-          });
-      };
-      reader.readAsDataURL(file);
-  };
-
-  const handleBgPropertyChange = (key: 'opacity' | 'scale', value: string) => {
-      if (!mapData.backgroundImage) return;
-      const num = parseFloat(value);
-      if (isNaN(num)) return;
-      
-      onUpdateMap({
-          backgroundImage: {
-              ...mapData.backgroundImage,
-              [key]: num
-          }
-      });
-  };
-
-  const handleRemoveBgImage = () => {
-      onUpdateMap({ backgroundImage: undefined });
+  // Helper to get image name
+  const getSelectedImageName = () => {
+      if (!selectedObject || !selectedObject.properties?.customImageId) return "Custom Image";
+      const img = mapData.customImages?.find(i => i.id === selectedObject.properties?.customImageId);
+      return img ? img.name : "Unknown Image";
   };
 
   return (
@@ -136,6 +113,72 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       {/* SCROLLABLE CONTENT AREA */}
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
         
+        {/* SELECTED OBJECT PROPERTIES */}
+        {selectedObject && (
+            <PropertySection
+                title="Selected Object"
+                icon={<BoxSelect size={14} />}
+                isOpen={openSections.selected}
+                onToggle={() => toggleSection('selected')}
+                highlight
+            >
+                <div className="space-y-4">
+                    <div className="text-xs text-blue-200 font-mono mb-2 p-2 bg-blue-900/30 rounded border border-blue-800 break-all">
+                        ID: {selectedObject.id.split('-')[0]}...
+                    </div>
+                    
+                    {selectedObject.type === 'CustomImage' && (
+                        <>
+                            <div className="text-xs text-gray-400 italic truncate" title={getSelectedImageName()}>
+                                {getSelectedImageName()}
+                            </div>
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-[10px] text-gray-400">Opacity</span>
+                                    <span className="text-[10px] text-white">{Math.round((selectedObject.properties?.opacity ?? 1) * 100)}%</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="0" 
+                                    max="1" 
+                                    step="0.05"
+                                    value={selectedObject.properties?.opacity ?? 1}
+                                    onChange={(e) => onUpdateObject(selectedObject.id, { opacity: parseFloat(e.target.value) })}
+                                    className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-[10px] text-gray-400">Scale</span>
+                                    <span className="text-[10px] text-white">{selectedObject.properties?.scale ?? 1}x</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <ZoomIn size={14} className="text-gray-500"/>
+                                    <input 
+                                        type="number" 
+                                        min="0.1" 
+                                        max="10" 
+                                        step="0.1"
+                                        value={selectedObject.properties?.scale ?? 1}
+                                        onChange={(e) => onUpdateObject(selectedObject.id, { scale: parseFloat(e.target.value) })}
+                                        className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <button 
+                        onClick={() => onDeleteObject(selectedObject.id)}
+                        className="w-full flex items-center justify-center gap-2 bg-red-900/30 hover:bg-red-900/50 text-red-200 text-xs font-bold py-2 px-3 rounded border border-red-900/50 transition-colors"
+                    >
+                        <Trash2 size={14} />
+                        DELETE OBJECT
+                    </button>
+                </div>
+            </PropertySection>
+        )}
+
         {/* Map Settings */}
         <PropertySection 
             title="General" 
@@ -218,79 +261,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                         />
                         <span className="text-xs font-mono text-gray-400 uppercase">{mapData.backgroundColor}</span>
                   </div>
-              </div>
-
-              {/* Image Upload */}
-              <div>
-                  <div className="flex justify-between items-center mb-2">
-                      <label className="flex items-center gap-2 text-xs font-semibold text-gray-400">
-                            Texture Image
-                      </label>
-                  </div>
-                  
-                  {!mapData.backgroundImage ? (
-                      <label className="flex flex-col items-center justify-center w-full h-20 bg-gray-800 border-2 border-dashed border-gray-600 rounded cursor-pointer hover:border-gray-400 hover:bg-gray-700 transition-colors">
-                          <span className="text-xs text-gray-500 flex items-center gap-1"><Plus size={12}/> Upload Image</span>
-                          <input type="file" accept="image/*" onChange={handleBgImageUpload} className="hidden" />
-                      </label>
-                  ) : (
-                      <div className="space-y-3 bg-gray-800 p-2 rounded border border-gray-600">
-                          <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 overflow-hidden">
-                                  <div className="w-8 h-8 rounded bg-gray-700 flex-shrink-0 overflow-hidden border border-gray-600">
-                                      <img src={mapData.backgroundImage.data} alt="Bg" className="w-full h-full object-cover" />
-                                  </div>
-                                  <span className="text-[10px] text-gray-400 truncate max-w-[100px]" title={mapData.backgroundImage.name}>
-                                      {mapData.backgroundImage.name}
-                                  </span>
-                              </div>
-                              <button 
-                                onClick={handleRemoveBgImage}
-                                className="text-red-400 hover:text-red-300 p-1 hover:bg-gray-700 rounded"
-                                title="Remove Image"
-                              >
-                                  <Trash2 size={14} />
-                              </button>
-                          </div>
-
-                          <div>
-                              <div className="flex justify-between mb-1">
-                                  <span className="text-[10px] text-gray-400">Opacity</span>
-                                  <span className="text-[10px] text-white">{Math.round(mapData.backgroundImage.opacity * 100)}%</span>
-                              </div>
-                              <input 
-                                  type="range" 
-                                  min="0" 
-                                  max="1" 
-                                  step="0.05"
-                                  value={mapData.backgroundImage.opacity}
-                                  onChange={(e) => handleBgPropertyChange('opacity', e.target.value)}
-                                  className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                              />
-                          </div>
-
-                          <div>
-                              <div className="flex justify-between mb-1">
-                                  <span className="text-[10px] text-gray-400">Scale</span>
-                                  <span className="text-[10px] text-white">{mapData.backgroundImage.scale}x</span>
-                              </div>
-                              <input 
-                                  type="number" 
-                                  min="0.1" 
-                                  max="10" 
-                                  step="0.1"
-                                  value={mapData.backgroundImage.scale}
-                                  onChange={(e) => handleBgPropertyChange('scale', e.target.value)}
-                                  className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white"
-                              />
-                          </div>
-                          
-                          <label className="block w-full text-center text-[10px] text-blue-400 cursor-pointer hover:underline mt-1 pt-2 border-t border-gray-700">
-                              Replace Image
-                              <input type="file" accept="image/*" onChange={handleBgImageUpload} className="hidden" />
-                          </label>
-                      </div>
-                  )}
               </div>
         </PropertySection>
 

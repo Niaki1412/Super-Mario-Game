@@ -24,7 +24,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const appRef = useRef<PIXI.Application | null>(null);
   
   // Layer Refs
-  const backgroundContainerRef = useRef<PIXI.Container | null>(null);
+  const customImagesContainerRef = useRef<PIXI.Container | null>(null);
   const staticGraphicsRef = useRef<PIXI.Graphics | null>(null);
   const staticLabelsRef = useRef<PIXI.Container | null>(null);
   const dynamicGraphicsRef = useRef<PIXI.Graphics | null>(null);
@@ -42,7 +42,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     onTileClickRef.current = onTileClick;
   }, [onTileClick]);
 
-  // Keep ref to mapData for the ticker (for objects)
+  // Keep ref to mapData for the ticker
   const mapDataRef = useRef(mapData);
   useEffect(() => {
     mapDataRef.current = mapData;
@@ -101,12 +101,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         appRef.current = app;
 
         // Setup Scene Layers (Order matters)
-        // 0. Background Image Layer
-        const bgL = new PIXI.Container();
-        backgroundContainerRef.current = bgL;
-        app.stage.addChild(bgL);
+        
+        // 0. Custom Images Layer (Below grid)
+        const customImgL = new PIXI.Container();
+        customImagesContainerRef.current = customImgL;
+        app.stage.addChild(customImgL);
 
-        // 1. Static Layer (Grid, Ruler, Tiles) - Drawn only on change
+        // 1. Static Layer (Grid, Ruler, Tiles)
         const staticG = new PIXI.Graphics();
         staticGraphicsRef.current = staticG;
         app.stage.addChild(staticG);
@@ -115,7 +116,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         staticLabelsRef.current = staticL;
         app.stage.addChild(staticL);
 
-        // 2. Dynamic Layer (Objects, Animations) - Drawn every frame
+        // 2. Dynamic Layer (Objects, Animations)
         const dynamicG = new PIXI.Graphics();
         dynamicGraphicsRef.current = dynamicG;
         app.stage.addChild(dynamicG);
@@ -131,7 +132,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const getGridPos = (e: PIXI.FederatedPointerEvent) => {
             const adjX = e.global.x - RULER_OFFSET;
             const adjY = e.global.y - RULER_OFFSET;
-            // Use current map data directly here if possible, or ref
+            // Use current map data directly here if possible
             const currentTS = mapDataRef.current.tileSize;
             const x = Math.floor(adjX / currentTS);
             const y = Math.floor(adjY / currentTS);
@@ -140,7 +141,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
         const onPointerDown = (e: PIXI.FederatedPointerEvent) => {
             const { x, y } = getGridPos(e);
-            if (x < 0 || y < 0) return;
             
             isPaintingRef.current = true;
             lastGridPosRef.current = { x, y };
@@ -152,7 +152,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const onPointerMove = (e: PIXI.FederatedPointerEvent) => {
             if (!isPaintingRef.current) return;
             const { x, y } = getGridPos(e);
-            if (x < 0 || y < 0) return;
 
             const last = lastGridPosRef.current;
             if (last && last.x === x && last.y === y) return;
@@ -172,7 +171,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         app.stage.on('pointerup', onPointerUp);
         app.stage.on('pointerupoutside', onPointerUp);
 
-        // Add Rendering Loop for DYNAMIC objects only
+        // Add Rendering Loop
         app.ticker.add(drawDynamicLoop);
 
         setIsAppReady(true);
@@ -188,14 +187,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         appRef.current.ticker.remove(drawDynamicLoop);
         appRef.current.destroy({ removeView: true });
         appRef.current = null;
-        backgroundContainerRef.current = null;
-        staticGraphicsRef.current = null;
-        staticLabelsRef.current = null;
-        dynamicGraphicsRef.current = null;
-        dynamicLabelsRef.current = null;
       }
     };
-  }, []); // Run once on mount
+  }, []); 
 
   // Handle Context Menu
   useEffect(() => {
@@ -229,50 +223,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
   // --- RENDERING LOGIC ---
 
-  // Draw Background Image
-  useEffect(() => {
-      if (!isAppReady || !backgroundContainerRef.current) return;
-      const container = backgroundContainerRef.current;
-      
-      // Clear existing
-      container.removeChildren().forEach(c => c.destroy());
-
-      if (mapData.backgroundImage && mapData.backgroundImage.data) {
-          PIXI.Assets.load(mapData.backgroundImage.data).then((texture) => {
-              if (container.children.length > 0) return; // Avoid double add if race condition
-              
-              const sprite = new PIXI.Sprite(texture);
-              sprite.x = RULER_OFFSET;
-              sprite.y = RULER_OFFSET;
-              sprite.alpha = mapData.backgroundImage!.opacity;
-              sprite.scale.set(mapData.backgroundImage!.scale);
-              container.addChild(sprite);
-          }).catch(err => console.error("Failed to load bg image", err));
-      }
-
-  }, [mapData.backgroundImage, isAppReady]);
-
-
-  // Helper to draw text
-  const addLabel = (container: PIXI.Container, text: string, x: number, y: number, align: 'center' | 'right' = 'center', color = 0x999999, size = 10, bold = false) => {
-    const t = new PIXI.Text({
-        text,
-        style: {
-            fontFamily: 'Arial',
-            fontSize: size,
-            fontWeight: bold ? 'bold' : 'normal',
-            fill: color,
-            align: align
-        }
-    });
-    t.x = x;
-    t.y = y;
-    t.anchor.set(align === 'center' ? 0.5 : 1, 0.5);
-    container.addChild(t);
-  };
-
-  // 1. Draw Static Layer (Grid, Ruler, Tiles)
-  // This is called via useEffect whenever map structure changes, NOT every frame.
+  // 1. Draw Static Layer
   const drawStatic = () => {
       if (!staticGraphicsRef.current || !staticLabelsRef.current) return;
       
@@ -281,39 +232,26 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       const tileSize = mapData.tileSize;
       
       g.clear();
-      
-      // Destroy old labels to free memory
-      const oldLabels = labels.removeChildren();
-      for (const child of oldLabels) {
-          child.destroy({ texture: true, children: true });
-      }
+      labels.removeChildren().forEach(c => c.destroy({ texture: true }));
 
-      // --- Draw Ruler Background ---
+      // Ruler Bg
       g.rect(0, 0, mapData.width * tileSize + RULER_OFFSET, RULER_OFFSET).fill(0x1a1a1a);
       g.rect(0, 0, RULER_OFFSET, mapData.height * tileSize + RULER_OFFSET).fill(0x1a1a1a);
       
-      // --- Draw Grid & Labels ---
-      // Vertical
+      // Grid & Labels
       for (let x = 0; x <= mapData.width; x++) {
         const xPos = x * tileSize + RULER_OFFSET;
-        g.moveTo(xPos, RULER_OFFSET);
-        g.lineTo(xPos, mapData.height * tileSize + RULER_OFFSET);
-        if (x < mapData.width) {
-            addLabel(labels, `${x}`, xPos + tileSize/2, RULER_OFFSET / 2);
-        }
+        g.moveTo(xPos, RULER_OFFSET).lineTo(xPos, mapData.height * tileSize + RULER_OFFSET);
+        if (x < mapData.width) addLabel(labels, `${x}`, xPos + tileSize/2, RULER_OFFSET / 2);
       }
-      // Horizontal
       for (let y = 0; y <= mapData.height; y++) {
         const yPos = y * tileSize + RULER_OFFSET;
-        g.moveTo(RULER_OFFSET, yPos);
-        g.lineTo(mapData.width * tileSize + RULER_OFFSET, yPos);
-        if (y < mapData.height) {
-            addLabel(labels, `${y}`, RULER_OFFSET / 2, yPos + tileSize/2);
-        }
+        g.moveTo(RULER_OFFSET, yPos).lineTo(mapData.width * tileSize + RULER_OFFSET, yPos);
+        if (y < mapData.height) addLabel(labels, `${y}`, RULER_OFFSET / 2, yPos + tileSize/2);
       }
       g.stroke({ width: 1, color: 0x555555, alpha: 0.5 });
 
-      // --- Draw Tiles ---
+      // Tiles
       mapData.tiles.forEach((row, y) => {
         row.forEach((tileId, x) => {
           if (tileId !== 0) {
@@ -328,50 +266,63 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       });
   };
 
-  // 2. Draw Dynamic Layer (Objects)
-  // This is called every frame by the ticker to support animations (Cloud, etc.)
-  const drawDynamicLoop = () => {
-    if (!dynamicGraphicsRef.current || !dynamicLabelsRef.current) return;
+  // Helper
+  const addLabel = (container: PIXI.Container, text: string, x: number, y: number, align: 'center' | 'right' = 'center', color = 0x999999, size = 10) => {
+    const t = new PIXI.Text({
+        text,
+        style: { fontFamily: 'Arial', fontSize: size, fill: color, align: align }
+    });
+    t.x = x; t.y = y; t.anchor.set(align === 'center' ? 0.5 : 1, 0.5);
+    container.addChild(t);
+  };
 
+  // 2. Draw Dynamic Loop
+  const drawDynamicLoop = () => {
     const g = dynamicGraphicsRef.current;
     const labels = dynamicLabelsRef.current;
+    const customImgContainer = customImagesContainerRef.current;
     const currentMap = mapDataRef.current;
     const tileSize = currentMap.tileSize;
 
-    g.clear();
-    
-    // Destroy old dynamic labels (e.g., text decorations)
-    const oldLabels = labels.removeChildren();
-    for (const child of oldLabels) {
-        child.destroy({ texture: true, children: true });
-    }
+    if (!g || !labels || !customImgContainer) return;
 
-    // --- Draw Objects ---
+    g.clear();
+    labels.removeChildren().forEach(c => c.destroy({ texture: true }));
+    // Clear custom images to redraw them based on map state. 
+    // Optimization: could be smarter, but this ensures updates sync with properties.
+    customImgContainer.removeChildren().forEach(c => c.destroy());
+
+    // Draw Objects
     currentMap.objects.forEach((obj) => {
-        const config = GAME_ELEMENTS_REGISTRY.find(el => el.name.toLowerCase() === obj.type.toLowerCase() || (el.type === 'object' && el.name === obj.type));
-        
-        if (config) {
-            const drawX = obj.x + RULER_OFFSET;
-            const drawY = obj.y + RULER_OFFSET;
-            // Ensure size matches map tile size
-            config.renderPixi(g, labels, drawX, drawY, tileSize, tileSize, obj);
+        const drawX = obj.x + RULER_OFFSET;
+        const drawY = obj.y + RULER_OFFSET;
+
+        if (obj.type === 'CustomImage') {
+            const imgDef = currentMap.customImages?.find(ci => ci.id === obj.properties?.customImageId);
+            if (imgDef) {
+                const texture = PIXI.Texture.from(imgDef.data);
+                const sprite = new PIXI.Sprite(texture);
+                sprite.x = drawX;
+                sprite.y = drawY;
+                sprite.alpha = obj.properties?.opacity ?? 1;
+                sprite.scale.set(obj.properties?.scale ?? 1);
+                customImgContainer.addChild(sprite);
+            }
+        } else {
+            const config = GAME_ELEMENTS_REGISTRY.find(el => el.name.toLowerCase() === obj.type.toLowerCase() || (el.type === 'object' && el.name === obj.type));
+            if (config) {
+                config.renderPixi(g, labels, drawX, drawY, tileSize, tileSize, obj);
+            }
         }
     });
   };
 
-  // Trigger Static Redraw when map structure changes
+  // Trigger Static Redraw
   useEffect(() => {
       if (isAppReady) {
           drawStatic();
       }
   }, [mapData.tiles, mapData.width, mapData.height, mapData.tileSize, isAppReady]);
-
-
-  const getCursorStyle = () => {
-      if (selectedElementId === TOOL_ERASER) return 'cursor-[url(https://www.google.com/url?sa=i&url=https%3A%2F%2Ficon-icons.com%2Ficon%2Feraser%2F112674&psig=AOvVaw0_..._nope_just_use_class)] cursor-crosshair';
-      if (selectedElementId) return 'cursor-pointer';
-      return 'cursor-default';
-  };
 
   return (
     <div 
@@ -382,7 +333,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
              <div 
                 ref={canvasRef} 
                 className={`shadow-2xl border border-gray-800 transition-all ${selectedElementId === TOOL_ERASER ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                title={selectedElementId === TOOL_ERASER ? 'Eraser Tool' : 'Paint'}
              />
         </div>
     </div>
