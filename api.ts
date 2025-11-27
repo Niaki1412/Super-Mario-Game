@@ -64,6 +64,11 @@ export interface SaveMapResponse {
     map_id: number;
 }
 
+export interface UploadResponse {
+    url: string;
+    origin_name: string;
+}
+
 // Keeping legacy MapOut for compatibility if needed, but aligned with Detail
 export type MapOut = MapDetail;
 
@@ -197,4 +202,23 @@ export const publishMap = async (data: PublishIn, token: string): Promise<void> 
       body: JSON.stringify(data)
     });
     if (!res.ok) throw new Error('Failed to publish map');
+};
+
+export const uploadFile = async (file: File, token: string): Promise<UploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE}/upload`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+        body: formData
+    });
+
+    if (!res.ok) {
+        throw new Error('Upload failed');
+    }
+    const json = await res.json();
+    return json.data;
 };

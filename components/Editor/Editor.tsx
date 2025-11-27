@@ -8,7 +8,7 @@ import { Game } from '../Game/Game';
 import { GameMap, GameObjectData, CustomImageDef } from '../../types';
 import { DEFAULT_MAP_HEIGHT, DEFAULT_MAP_WIDTH, TILE_SIZE as DEFAULT_TILE_SIZE, TOOL_ERASER, TOOL_SELECT } from '../../constants';
 import { getElementById } from '../../elementRegistry';
-import { saveMap, getMapById, MapIn } from '../../api';
+import { saveMap, getMapById, MapIn, uploadFile } from '../../api';
 import { X, CheckCircle, AlertTriangle, Cloud, Loader2, Check, XCircle } from 'lucide-react';
 
 const STORAGE_KEY = 'MARIO_MAP_DATA';
@@ -231,25 +231,45 @@ export const Editor: React.FC = () => {
       setMapData(prev => ({ ...prev, backgroundColor: color }));
   };
 
-  // Image Upload Logic
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload Logic - UPDATED TO USE BACKEND API
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files || files.length === 0) return;
 
-      Array.from(files).forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-              const result = ev.target?.result as string;
-              setMapData(prev => ({
-                  ...prev,
-                  customImages: [
-                      ...(prev.customImages || []),
-                      { id: crypto.randomUUID(), name: file.name, data: result }
-                  ]
-              }));
-          };
-          reader.readAsDataURL(file);
-      });
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+          showToast("Please login to upload images", 'error');
+          return;
+      }
+
+      const newImages: CustomImageDef[] = [];
+
+      for (const file of Array.from(files)) {
+          try {
+              const data = await uploadFile(file, token);
+              newImages.push({
+                  id: crypto.randomUUID(),
+                  name: data.origin_name,
+                  data: data.url 
+              });
+          } catch (err) {
+              console.error("Upload error", err);
+              showToast(`Failed to upload ${file.name}`, 'error');
+          }
+      }
+
+      if (newImages.length > 0) {
+          setMapData(prev => ({
+              ...prev,
+              customImages: [
+                  ...(prev.customImages || []),
+                  ...newImages
+              ]
+          }));
+          showToast(`Uploaded ${newImages.length} image(s)`, 'success');
+      }
+      
+      e.target.value = ''; 
   };
 
   const handleTileClick = useCallback((x: number, y: number, isRightClick: boolean, isDrag: boolean) => {

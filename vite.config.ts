@@ -12,6 +12,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Proxy static files (uploaded images) to backend
+      '/static/': {
+        target: 'http://127.0.0.1:8999',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });
