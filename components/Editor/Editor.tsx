@@ -259,13 +259,14 @@ export const Editor: React.FC = () => {
       }
 
       if (newImages.length > 0) {
-          setMapData(prev => ({
-              ...prev,
-              customImages: [
-                  ...(prev.customImages || []),
-                  ...newImages
-              ]
-          }));
+          setMapData(prev => {
+              // Ensure customImages is array before spreading
+              const currentImages = Array.isArray(prev.customImages) ? prev.customImages : [];
+              return { 
+                  ...prev, 
+                  customImages: [...currentImages, ...newImages] 
+              };
+          });
           showToast(`Uploaded ${newImages.length} image(s)`, 'success');
       }
       
@@ -318,8 +319,22 @@ export const Editor: React.FC = () => {
     // --- CUSTOM IMAGE LOGIC ---
     if (typeof selectedElementId === 'string' && selectedElementId.startsWith('custom_img:')) {
         const imageId = selectedElementId.replace('custom_img:', '');
-        const imageDef = mapData.customImages.find(img => img.id === imageId);
-        if (!imageDef) return;
+        const imageDef = mapData.customImages?.find(img => img.id === imageId);
+        
+        if (!imageDef) {
+            console.error("Image definition not found", imageId);
+            return;
+        }
+
+        // Avoid adding multiple images on the same spot if dragging
+        if (isDrag) {
+             const exists = mapData.objects.find(o => 
+                 o.type === 'CustomImage' && 
+                 o.x === pixelX && o.y === pixelY && 
+                 o.properties?.customImageId === imageId
+             );
+             if (exists) return;
+        }
 
         const newObj: GameObjectData = {
             id: crypto.randomUUID(),
@@ -330,7 +345,7 @@ export const Editor: React.FC = () => {
                 customImageId: imageId,
                 opacity: 1,
                 scale: 1,
-                width: currentTileSize * 2, // Default size 2x2 tiles
+                width: currentTileSize * 2,
                 height: currentTileSize * 2
             }
         };
@@ -423,6 +438,8 @@ export const Editor: React.FC = () => {
         .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
         @keyframes zoom-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-zoom-in { animation: zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
       `}</style>
 
       {/* --- MODALS & OVERLAYS --- */}
