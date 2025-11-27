@@ -31,6 +31,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const dynamicLabelsRef = useRef<PIXI.Container | null>(null);
 
   const [isAppReady, setIsAppReady] = useState(false);
+  
+  // Texture Cache to prevent PixiJS warnings and ensure loading
+  const textureCache = useRef<Map<string, PIXI.Texture>>(new Map());
 
   // Drag State
   const isPaintingRef = useRef(false);
@@ -54,6 +57,33 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           appRef.current.renderer.background.color = mapData.backgroundColor;
       }
   }, [mapData.backgroundColor, isAppReady]);
+
+  // --- PRELOAD CUSTOM IMAGES ---
+  useEffect(() => {
+      if (!mapData.customImages) return;
+
+      const loadTextures = async () => {
+          for (const img of mapData.customImages) {
+              // If not already cached
+              if (!textureCache.current.has(img.id)) {
+                  try {
+                      // Check if Pixi's global cache has it (by URL)
+                      if (PIXI.Assets.cache.has(img.data)) {
+                          textureCache.current.set(img.id, PIXI.Assets.get(img.data));
+                      } else {
+                          // Load it explicitly
+                          const texture = await PIXI.Assets.load(img.data);
+                          textureCache.current.set(img.id, texture);
+                      }
+                  } catch (e) {
+                      console.warn(`Failed to load texture for ${img.name}:`, e);
+                  }
+              }
+          }
+      };
+      
+      loadTextures();
+  }, [mapData.customImages]);
 
   // Initialize Pixi
   useEffect(() => {
@@ -298,9 +328,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const drawY = obj.y + RULER_OFFSET;
 
         if (obj.type === 'CustomImage') {
-            const imgDef = currentMap.customImages?.find(ci => ci.id === obj.properties?.customImageId);
-            if (imgDef) {
-                const texture = PIXI.Texture.from(imgDef.data);
+            const imgId = obj.properties?.customImageId;
+            // Only draw if texture is available in cache
+            if (imgId && textureCache.current.has(imgId)) {
+                const texture = textureCache.current.get(imgId)!;
                 const sprite = new PIXI.Sprite(texture);
                 sprite.x = drawX;
                 sprite.y = drawY;

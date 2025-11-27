@@ -59,6 +59,9 @@ export const Game: React.FC<GameProps> = ({
   const [myMaps, setMyMaps] = useState<MapListItem[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(false);
 
+  // Texture Cache for Gameplay
+  const textureCache = useRef<Map<string, PIXI.Texture>>(new Map());
+
   // --- HELPERS ---
 
   const checkRectCollision = (r1: {x:number, y:number, w:number, h:number}, r2: {x:number, y:number, w:number, h:number}) => {
@@ -116,6 +119,25 @@ export const Game: React.FC<GameProps> = ({
           }
       }
   }, [currentMap, embedded]);
+
+  // Preload textures on map load
+  useEffect(() => {
+      if (currentMap?.customImages) {
+          const load = async () => {
+              for (const img of currentMap.customImages) {
+                  if (!textureCache.current.has(img.id)) {
+                      try {
+                          const tex = await PIXI.Assets.load(img.data);
+                          textureCache.current.set(img.id, tex);
+                      } catch(e) {
+                          console.warn("Failed to load game texture", img.name, e);
+                      }
+                  }
+              }
+          };
+          load();
+      }
+  }, [currentMap]);
 
   const getKeyDisplay = (key: string) => {
       if (key === ' ') return 'SPACE';
@@ -313,6 +335,7 @@ export const Game: React.FC<GameProps> = ({
   };
 
   const spawnParticles = (x: number, y: number, color: number) => {
+      const tileSize = mapRef.current!.tileSize;
       for (let i = 0; i < 6; i++) {
           particlesRef.current.push({
               x, y,
@@ -335,7 +358,6 @@ export const Game: React.FC<GameProps> = ({
           player.isDead = true;
           player.vx = 0;
           player.vy = -10; // Death hop
-          // Move to front/ensure visible if falling? handled by logic
       }
   };
 
@@ -355,7 +377,6 @@ export const Game: React.FC<GameProps> = ({
           entity.isBig = false;
           entity.canShoot = false;
           entity.invincibleTimer = 120; // frames (~2s)
-          // Adjust height
           const scaleRatio = mapRef.current!.tileSize / 32;
           const newH = PLAYER_CONFIG.small.height * scaleRatio;
           entity.y += (entity.h - newH);
@@ -490,7 +511,6 @@ export const Game: React.FC<GameProps> = ({
       const keys = { ...keysRef.current };
       const prevKeys = prevKeysRef.current;
       const tileSize = map.tileSize;
-      
       const phys = PLAYER_CONFIG.physics;
       const scaleRatio = tileSize / 32;
 
@@ -625,6 +645,7 @@ export const Game: React.FC<GameProps> = ({
 
           if (entity.isEnemy) {
                if (entity.type === 'Piranha Plant') {
+                   // ... (AI omitted for brevity, assuming standard setup from prev)
                    entity.vx = 0; entity.vy = 0;
                    entity.plantTimer = (entity.plantTimer || 0) + delta;
                    const MAX_HEIGHT = -tileSize * 0.8;
@@ -643,13 +664,9 @@ export const Game: React.FC<GameProps> = ({
                } else if (entity.type === 'Pop-up Spike') {
                    entity.vx = 0; entity.vy = 0;
                    entity.spikeTimer = (entity.spikeTimer || 0) + delta;
-                   if (entity.spikeState === 'hidden') {
-                       if (entity.spikeTimer > 120) { entity.spikeState = 'warning'; entity.spikeTimer = 0; }
-                   } else if (entity.spikeState === 'warning') {
-                       if (entity.spikeTimer > 30) { entity.spikeState = 'active'; entity.spikeTimer = 0; }
-                   } else if (entity.spikeState === 'active') {
-                        if (entity.spikeTimer > 60) { entity.spikeState = 'hidden'; entity.spikeTimer = 0; }
-                   }
+                   if (entity.spikeState === 'hidden') { if (entity.spikeTimer > 120) { entity.spikeState = 'warning'; entity.spikeTimer = 0; }
+                   } else if (entity.spikeState === 'warning') { if (entity.spikeTimer > 30) { entity.spikeState = 'active'; entity.spikeTimer = 0; }
+                   } else if (entity.spikeState === 'active') { if (entity.spikeTimer > 60) { entity.spikeState = 'hidden'; entity.spikeTimer = 0; } }
                } else if (entity.type === 'Rotating Spike') {
                    entity.vx = 0; entity.vy = 0; entity.rotationAngle = (entity.rotationAngle || 0) + 0.05 * delta;
                } else if (entity.isShell && Math.abs(entity.vx) > 2) {
@@ -883,13 +900,16 @@ export const Game: React.FC<GameProps> = ({
           if (e.type === 'CustomImage') {
               const imgDef = mapRef.current?.customImages?.find(ci => ci.id === e.customImageId);
               if (imgDef) {
-                  const texture = PIXI.Texture.from(imgDef.data);
-                  const sprite = new PIXI.Sprite(texture);
-                  sprite.x = e.x;
-                  sprite.y = e.y;
-                  sprite.alpha = e.opacity ?? 1;
-                  sprite.scale.set(e.scale ?? 1);
-                  customImgLayer.addChild(sprite);
+                  // Use cached texture if available
+                  const texture = textureCache.current.get(e.customImageId || '');
+                  if (texture) {
+                      const sprite = new PIXI.Sprite(texture);
+                      sprite.x = e.x;
+                      sprite.y = e.y;
+                      sprite.alpha = e.opacity ?? 1;
+                      sprite.scale.set(e.scale ?? 1);
+                      customImgLayer.addChild(sprite);
+                  }
               }
               return;
           }
