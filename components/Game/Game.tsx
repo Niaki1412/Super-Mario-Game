@@ -1094,9 +1094,9 @@ export const Game: React.FC<GameProps> = ({
     reader.readAsText(file);
   };
 
-  const handleLoadFromApi = async (id: number) => {
+  const handleLoadFromApi = async (id: number, isPublic: boolean = false) => {
       const token = localStorage.getItem('access_token');
-      if (!token) {
+      if (!token && !isPublic) {
           alert("Please login to play cloud maps");
           return;
       }
