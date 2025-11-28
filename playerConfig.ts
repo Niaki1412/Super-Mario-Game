@@ -35,7 +35,7 @@ export const PLAYER_CONFIG = {
         hitboxOffset: { x: 0, y: 0 }
     },
 
-    // Visual Palette (Normal)
+    // Visual Palette (Normal Mario)
     appearance: {
         hat: 0xEE2200,      // Red
         shirt: 0xEE2200,    // Red
@@ -47,7 +47,7 @@ export const PLAYER_CONFIG = {
         eye: 0x000000
     },
 
-    // Visual Palette (Fire)
+    // Visual Palette (Fire Mario)
     fireAppearance: {
         hat: 0xFFFFFF,      // White
         shirt: 0xFFFFFF,    // White
@@ -57,5 +57,18 @@ export const PLAYER_CONFIG = {
         shoes: 0x441100,    // Brown
         buttons: 0xFFDD00,  // Gold
         eye: 0x000000
+    }
+};
+
+export const CHARACTERS = {
+    mario: {
+        name: "Mario",
+        description: "The classic plumber.",
+        color: 0xEE2200
+    },
+    wukong: {
+        name: "Sun Wukong",
+        description: "The Monkey King. Transforms into a Gorilla.",
+        color: 0xFFD700
     }
 };

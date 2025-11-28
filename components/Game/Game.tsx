@@ -26,6 +26,10 @@ interface GameProps {
     embedded?: boolean;
 }
 
+interface ExtendedEntity extends Entity {
+    bulletVariant?: 'fireball' | 'banana';
+}
+
 export const Game: React.FC<GameProps> = ({ 
     initialMapData, 
     width, 
@@ -39,7 +43,7 @@ export const Game: React.FC<GameProps> = ({
   const appRef = useRef<PIXI.Application | null>(null);
   
   const mapRef = useRef<GameMap | null>(initialMapData || null);
-  const entitiesRef = useRef<Entity[]>([]);
+  const entitiesRef = useRef<ExtendedEntity[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const keysRef = useRef<Record<string, boolean>>({});
   const prevKeysRef = useRef<Record<string, boolean>>({}); 
@@ -47,6 +51,7 @@ export const Game: React.FC<GameProps> = ({
   const isGameOverRef = useRef(false);
   const isWonRef = useRef(false);
   const lastDirRef = useRef(1); 
+  const characterRef = useRef<string>('mario');
 
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
@@ -97,6 +102,13 @@ export const Game: React.FC<GameProps> = ({
     const saved = localStorage.getItem('MARIO_CONTROLS');
     if (saved) {
         try { setControls({ ...DEFAULT_CONTROLS, ...JSON.parse(saved) }); } catch(e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    const savedChar = localStorage.getItem('SELECTED_CHARACTER');
+    if (savedChar) {
+        characterRef.current = savedChar;
     }
   }, []);
 
@@ -212,7 +224,7 @@ export const Game: React.FC<GameProps> = ({
 
         audioManager.startBGM();
 
-        const newEntities: Entity[] = [];
+        const newEntities: ExtendedEntity[] = [];
         const tileSize = currentMap.tileSize;
         
         let startX = 100;
@@ -391,24 +403,27 @@ export const Game: React.FC<GameProps> = ({
       const tileSize = mapRef.current!.tileSize;
       const scaleRatio = tileSize / 32;
       const dir = lastDirRef.current;
+      const isWukong = characterRef.current === 'wukong';
       
       entitiesRef.current.push({
           id: `bullet-${Math.random()}`,
           type: 'Bullet',
           x: player.x + (dir > 0 ? player.w : -PLAYER_CONFIG.projectile.width * scaleRatio),
-          y: player.y + player.h * 0.4,
+          y: player.y + player.h * (isWukong ? 0.3 : 0.4),
           w: PLAYER_CONFIG.projectile.width * scaleRatio,
           h: PLAYER_CONFIG.projectile.height * scaleRatio,
           vx: dir * PLAYER_CONFIG.physics.bulletSpeed * scaleRatio,
-          vy: 0,
+          vy: isWukong ? -4 : 0, // Wukong throws banana in an arc (optional physics tweak) or straight
           isDead: false,
           grounded: false,
-          isBullet: true
-      } as Entity);
+          isBullet: true,
+          bulletVariant: isWukong ? 'banana' : 'fireball',
+          hasGravity: isWukong // Bananas obey gravity
+      } as ExtendedEntity);
       audioManager.playShoot();
   };
 
-  const handleTileCollision = (entity: Entity, map: GameMap, axis: 'x' | 'y') => {
+  const handleTileCollision = (entity: ExtendedEntity, map: GameMap, axis: 'x' | 'y') => {
       const tileSize = map.tileSize;
       const left = Math.floor(entity.x / tileSize);
       const right = Math.floor((entity.x + entity.w - 0.01) / tileSize);
@@ -425,7 +440,7 @@ export const Game: React.FC<GameProps> = ({
                        entity.x = right * tileSize - entity.w;
                        entity.vx = 0;
                        if (entity.isEnemy) entity.vx *= -1;
-                       else if (entity.isBullet) { entity.isDead = true; spawnParticles(entity.x + entity.w, entity.y, 0xFF4400); }
+                       else if (entity.isBullet) { entity.isDead = true; spawnParticles(entity.x + entity.w, entity.y, 0xFFD700); }
                        return;
                    }
               }
@@ -438,7 +453,7 @@ export const Game: React.FC<GameProps> = ({
                       entity.x = (left + 1) * tileSize;
                       entity.vx = 0;
                       if (entity.isEnemy) entity.vx *= -1;
-                      else if (entity.isBullet) { entity.isDead = true; spawnParticles(entity.x, entity.y, 0xFF4400); }
+                      else if (entity.isBullet) { entity.isDead = true; spawnParticles(entity.x, entity.y, 0xFFD700); }
                       return;
                   }
               }
@@ -459,16 +474,24 @@ export const Game: React.FC<GameProps> = ({
                       
                       if (isLethalTile(tileId)) {
                           if (entity.isPlayer) takeDamage(entity);
-                          else entity.isDead = true;
+                          else if (!entity.isBullet) entity.isDead = true; // Bullets die on walls, not floors usually?
+                          if (entity.isBullet) { 
+                             // Bananas bounce or die? Let's make them die for simplicity or bounce once
+                             entity.isDead = true; 
+                             spawnParticles(entity.x, entity.y + entity.h, 0xFFD700);
+                          }
+                      }
+                      
+                      if (entity.isBullet) {
+                          entity.isDead = true;
+                          spawnParticles(entity.x, entity.y + entity.h, 0xFFD700);
                       }
                       return;
                   }
                   
-                  // Check if just passing through lethal non-solid (like invisible death block if we had one that wasn't solid?)
-                  // Currently invisible death block is solid=false, lethal=true.
                   if (isLethalTile(tileId)) {
                       if (entity.isPlayer) takeDamage(entity);
-                      else entity.isDead = true;
+                      else if (!entity.isBullet) entity.isDead = true;
                   }
               }
           } else if (entity.vy < 0) { // Up
@@ -496,7 +519,7 @@ export const Game: React.FC<GameProps> = ({
                           }
                       } else if (entity.isBullet) {
                           entity.isDead = true;
-                          spawnParticles(entity.x, entity.y, 0xFF4400);
+                          spawnParticles(entity.x, entity.y, 0xFFD700);
                       }
                       return;
                   }
@@ -517,7 +540,7 @@ export const Game: React.FC<GameProps> = ({
       entitiesRef.current = entities.filter(e => {
           if (e.isDead && !e.isPlayer) return false;
           if (e.isEffect && e.vy > 5) return false; 
-          if (e.isBullet && (e.x < 0 || e.x > map.width * tileSize)) return false;
+          if (e.isBullet && (e.x < 0 || e.x > map.width * tileSize || e.y > map.height * tileSize)) return false;
           return true;
       });
       
@@ -534,6 +557,7 @@ export const Game: React.FC<GameProps> = ({
           if (entity.isDead && !entity.isPlayer) return;
           if (entity.type === 'CustomImage') return;
 
+          // Apply Gravity
           if (entity.hasGravity) {
             entity.vy += phys.gravity * scaleRatio * delta;
             if (entity.vy > phys.terminalVelocity * scaleRatio) entity.vy = phys.terminalVelocity * scaleRatio;
@@ -547,12 +571,26 @@ export const Game: React.FC<GameProps> = ({
 
           if (entity.isBullet) {
               entity.x += entity.vx * delta;
-              const tile = getTileAt(entity.x + entity.w/2, entity.y + entity.h/2, map);
-              if (isSolid(tile)) {
-                  entity.isDead = true;
-                  spawnParticles(entity.x, entity.y, 0xFF4400);
-                  return;
+              
+              // Wukong's banana physics (arc)
+              if (entity.bulletVariant === 'banana') {
+                  entity.y += entity.vy * delta;
+                  // Rotate visual? Handled in render.
+              } else {
+                  // Fireball/Simple straight shot
+                  const tile = getTileAt(entity.x + entity.w/2, entity.y + entity.h/2, map);
+                  if (isSolid(tile)) {
+                      entity.isDead = true;
+                      spawnParticles(entity.x, entity.y, 0xFF4400);
+                      return;
+                  }
               }
+              
+              if (entity.bulletVariant === 'banana') {
+                  handleTileCollision(entity, map, 'y');
+                  handleTileCollision(entity, map, 'x');
+              }
+
               entities.forEach(other => {
                   if (other === entity || other.isDead || !other.isEnemy) return;
                   if (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike') return;
@@ -644,8 +682,8 @@ export const Game: React.FC<GameProps> = ({
           }
 
           if (entity.isEnemy) {
+               // ... (Enemy AI logic remains same as before)
                if (entity.type === 'Piranha Plant') {
-                   // ... (AI omitted for brevity, assuming standard setup from prev)
                    entity.vx = 0; entity.vy = 0;
                    entity.plantTimer = (entity.plantTimer || 0) + delta;
                    const MAX_HEIGHT = -tileSize * 0.8;
@@ -728,6 +766,7 @@ export const Game: React.FC<GameProps> = ({
                       }
 
                       if (other.isEnemy) {
+                           // ... Enemy collision Logic ...
                           if (other.type === 'Piranha Plant') {
                               const offset = other.plantOffset || 0;
                               if (offset < -5) { 
@@ -812,10 +851,7 @@ export const Game: React.FC<GameProps> = ({
       prevKeysRef.current = { ...keys };
   };
 
-  const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
-      if (e.invincibleTimer && e.invincibleTimer > 0) {
-          if (Math.floor(Date.now() / 80) % 2 === 0) return;
-      }
+  const drawMario = (g: PIXI.Graphics, e: Entity) => {
       const x = e.x; const y = e.y; const w = e.w; const h = e.h;
       const isBig = e.isBig; const canShoot = e.canShoot;
       const isRight = lastDirRef.current > 0;
@@ -858,6 +894,86 @@ export const Game: React.FC<GameProps> = ({
       g.rect(tx(w*0.55, w*0.3), headY + headH * 0.7, w*0.3, headH*0.2).fill(colors.hair);
       g.circle(tx(w*0.85, 0), headY + headH * 0.6, w*0.12).fill(colors.skin);
       g.rect(tx(w*0.6, w*0.08), headY + headH * 0.4, w*0.08, headH*0.25).fill(colors.eye);
+  };
+
+  const drawWukong = (g: PIXI.Graphics, e: Entity) => {
+      const x = e.x; const y = e.y; const w = e.w; const h = e.h;
+      const isBig = e.isBig; // Big = Gorilla, Small = Monkey
+      const isRight = lastDirRef.current > 0;
+      const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
+      const tick = Date.now() / 150;
+      const isRunning = Math.abs(e.vx) > 0.1 && e.grounded;
+      const animOffset = isRunning ? Math.sin(tick) * (w * 0.1) : 0;
+
+      if (isBig) {
+          // GORILLA FORM
+          const furColor = 0x333333; // Dark Grey
+          const skinColor = 0x555555;
+          const chestColor = 0x222222;
+
+          // Legs
+          g.rect(tx(w*0.1, w*0.3), y + h*0.7, w*0.3, h*0.3).fill(furColor); // Back Leg
+          g.rect(tx(w*0.6, w*0.3), y + h*0.7, w*0.3, h*0.3).fill(furColor); // Front Leg
+          
+          // Body (Bulky)
+          g.rect(tx(w*0.05, w*0.9), y + h*0.25, w*0.9, h*0.55).fill(furColor);
+          // Chest
+          g.rect(tx(w*0.2, w*0.6), y + h*0.3, w*0.6, h*0.3).fill(chestColor);
+
+          // Arms (Long)
+          g.rect(tx(w*0.3 + animOffset, w*0.2), y + h*0.3, w*0.2, h*0.5).fill(furColor);
+
+          // Head
+          g.rect(tx(w*0.2, w*0.6), y, w*0.6, h*0.3).fill(furColor);
+          g.rect(tx(w*0.6, w*0.15), y + h*0.1, w*0.15, h*0.05).fill(0xFFFFFF); // Teeth/Mouth
+          g.circle(tx(w*0.65, 0), y + h*0.1, 2).fill(0xFF0000); // Angry Eye
+
+          // Weapon: Spiked Mace (Wolf Tooth Club)
+          const maceX = isRight ? x + w*0.8 : x + w*0.2;
+          const maceY = y + h*0.5;
+          g.moveTo(maceX, maceY).lineTo(maceX + (isRight?20:-20), maceY - 40).stroke({width: 6, color: 0x888888});
+          // Mace Head
+          g.circle(maceX + (isRight?20:-20), maceY - 40, 10).fill(0x555555);
+          // Spikes
+          g.circle(maceX + (isRight?24:-24), maceY - 44, 2).fill(0xAAAAAA);
+          g.circle(maceX + (isRight?16:-16), maceY - 36, 2).fill(0xAAAAAA);
+
+      } else {
+          // MONKEY FORM
+          const furColor = 0x8B4513; // SaddleBrown
+          const faceColor = 0xFFCCAA; // Skin
+          const clothesColor = 0xFFD700; // Gold
+
+          // Tail
+          const tailX = isRight ? x : x + w;
+          const tailEnd = isRight ? x - 10 : x + w + 10;
+          g.moveTo(tailX + (isRight?w*0.2:-w*0.2), y + h*0.8)
+           .quadraticCurveTo(tailEnd, y + h*0.5, tailEnd + (isRight?-5:5), y + h*0.3)
+           .stroke({width: 3, color: furColor});
+
+          // Legs
+          g.rect(tx(w*0.2 + animOffset, w*0.2), y + h*0.7, w*0.2, h*0.3).fill(furColor);
+          g.rect(tx(w*0.6 - animOffset, w*0.2), y + h*0.7, w*0.2, h*0.3).fill(furColor);
+
+          // Body
+          g.rect(tx(w*0.25, w*0.5), y + h*0.4, w*0.5, h*0.35).fill(furColor);
+          // Shirt/Vest
+          g.rect(tx(w*0.3, w*0.4), y + h*0.4, w*0.4, h*0.2).fill(clothesColor);
+
+          // Head
+          g.circle(tx(w*0.5, 0), y + h*0.25, w*0.35).fill(furColor);
+          // Face Mask shape
+          g.circle(tx(w*0.55, 0), y + h*0.28, w*0.25).fill(faceColor);
+          // Eyes
+          g.circle(tx(w*0.65, 0), y + h*0.25, 2).fill(0x000000);
+
+          // Weapon: Golden Stick (Ruyi Jingu Bang)
+          const stickX = isRight ? x + w*0.8 : x + w*0.2;
+          const stickY = y + h*0.6;
+          g.moveTo(stickX, stickY + 10).lineTo(stickX + (isRight?10:-10), stickY - 25).stroke({width: 3, color: 0xFF0000});
+          g.circle(stickX, stickY + 10, 2).fill(0xFFD700);
+          g.circle(stickX + (isRight?10:-10), stickY - 25, 2).fill(0xFFD700);
+      }
   };
 
   const render = (app: PIXI.Application) => {
@@ -915,13 +1031,26 @@ export const Game: React.FC<GameProps> = ({
           }
 
           if (e.isPlayer) {
-              drawPlayer(g, e); 
+              if (characterRef.current === 'wukong') {
+                  drawWukong(g, e);
+              } else {
+                  drawMario(g, e); 
+              }
           } else {
               const config = getElementByName(e.type);
               if (config && config.name !== 'Invisible Death Block') {
                  config.renderPixi(g, labels, e.x, e.y, e.w, e.h, e);
               } else if (e.isBullet) {
-                   g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
+                  // Draw Bullet
+                  if (e.bulletVariant === 'banana') {
+                      // Draw Banana
+                      const bx = e.x + e.w/2;
+                      const by = e.y + e.h/2;
+                      g.moveTo(bx - 5, by - 5).quadraticCurveTo(bx, by + 5, bx + 5, by - 5).stroke({width: 4, color: 0xFFD700});
+                  } else {
+                      // Fireball
+                      g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
+                  }
               }
           }
       });
