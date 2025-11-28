@@ -64,6 +64,22 @@ export const Editor: React.FC = () => {
       }, 3500);
   };
 
+  // Helper to remove base64 data to keep payloads small
+  const sanitizeMapData = useCallback((data: GameMap) => {
+      const clone = JSON.parse(JSON.stringify(data));
+      if (clone.customImages && Array.isArray(clone.customImages)) {
+          clone.customImages = clone.customImages.map((img: any) => {
+              // If it's a data URI (base64), strip it to save space/bandwidth
+              // We assume images should be uploaded and have URL references
+              if (img.data && typeof img.data === 'string' && img.data.trim().startsWith('data:')) {
+                  return { ...img, data: "" }; 
+              }
+              return img;
+          });
+      }
+      return clone;
+  }, []);
+
   // --- Init ---
   useEffect(() => {
     setTestConfig({
@@ -143,9 +159,11 @@ export const Editor: React.FC = () => {
 
       const idToSave = mapIdParam ? Number(mapIdParam) : null;
       
+      const mapToSave = sanitizeMapData(mapData);
+
       const payload: MapIn = {
           id: idToSave,
-          map_data: JSON.stringify(mapData),
+          map_data: JSON.stringify(mapToSave),
           is_public: false
       };
 
@@ -400,18 +418,7 @@ export const Editor: React.FC = () => {
   };
 
   const handleExport = () => {
-    // Clone mapData for modification
-    const exportMap = JSON.parse(JSON.stringify(mapData));
-
-    // Sanitize customImages to remove base64 strings if present
-    if (exportMap.customImages && Array.isArray(exportMap.customImages)) {
-        exportMap.customImages = exportMap.customImages.map((img: any) => {
-            if (img.data && typeof img.data === 'string' && img.data.startsWith('data:')) {
-                return { ...img, data: "" }; // Clear base64 data
-            }
-            return img;
-        });
-    }
+    const exportMap = sanitizeMapData(mapData);
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportMap, null, 2));
     const downloadAnchorNode = document.createElement('a');
@@ -590,3 +597,4 @@ export const Editor: React.FC = () => {
     </div>
   );
 };
+    
