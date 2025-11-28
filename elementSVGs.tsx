@@ -166,3 +166,53 @@ export const SvgTextDecoration = () => (
         <text x="16" y="22" fontSize="18" textAnchor="middle" fill="currentColor">Ab</text>
     </>
 );
+
+export const SvgMario = () => (
+    <>
+        {/* Legs */}
+        <path d="M8 20 H24 V30 H8 Z" fill="#2244CC" />
+        {/* Shoes */}
+        <path d="M6 28 H12 V32 H6 Z" fill="#441100" />
+        <path d="M20 28 H26 V32 H20 Z" fill="#441100" />
+        {/* Shirt/Arms */}
+        <path d="M2 14 H10 V20 H2 Z" fill="#EE2200" />
+        <path d="M22 14 H30 V20 H22 Z" fill="#EE2200" />
+        <rect x="10" y="14" width="12" height="16" fill="#2244CC" />
+        {/* Buttons */}
+        <circle cx="10" cy="18" r="1.5" fill="#FFDD00" />
+        <circle cx="22" cy="18" r="1.5" fill="#FFDD00" />
+        {/* Head */}
+        <rect x="7" y="5" width="18" height="11" fill="#FFCCAA" rx="2" />
+        {/* Hat */}
+        <path d="M4 5 H28 V9 H4 Z" fill="#EE2200" />
+        <path d="M8 2 H24 V5 H8 Z" fill="#EE2200" />
+        <circle cx="16" cy="4" r="2" fill="white" opacity="0.8"/>
+        <text x="16" y="6.5" fontSize="3" fontWeight="bold" textAnchor="middle" fill="#EE2200">M</text>
+        {/* Features */}
+        <rect x="20" y="8" width="2" height="4" fill="black" />
+        <path d="M14 12 H26 V14 H14 Z" fill="black" /> 
+        <rect x="24" y="10" width="3" height="3" fill="#FFCCAA" /> 
+    </>
+);
+
+export const SvgWukong = () => (
+    <>
+        {/* Tail */}
+        <path d="M4 22 Q0 18 4 14" stroke="#8B4513" strokeWidth="2" fill="none"/>
+        {/* Body */}
+        <rect x="10" y="14" width="12" height="12" fill="#FFD700" rx="2"/>
+        <rect x="8" y="26" width="6" height="6" fill="#8B4513" />
+        <rect x="18" y="26" width="6" height="6" fill="#8B4513" />
+        {/* Scarf/Collar */}
+        <path d="M10 14 H22 L16 18 Z" fill="#FF4500" />
+        {/* Head */}
+        <circle cx="16" cy="10" r="8" fill="#8B4513" />
+        <path d="M12 6 Q16 14 20 6 Q20 16 12 16 Q8 14 12 6" fill="#FFCCAA" />
+        {/* Eyes */}
+        <circle cx="14" cy="9" r="1" fill="black" />
+        <circle cx="18" cy="9" r="1" fill="black" />
+        {/* Circlet */}
+        <path d="M9 5 Q16 1 23 5" stroke="gold" strokeWidth="2" fill="none" />
+        <circle cx="16" cy="4" r="1.5" fill="red" />
+    </>
+);

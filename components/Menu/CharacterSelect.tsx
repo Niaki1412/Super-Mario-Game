@@ -1,8 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { CHARACTERS } from '../../playerConfig';
+import { SvgMario, SvgWukong } from '../../elementSVGs';
 
 export const CharacterSelect: React.FC = () => {
   const navigate = useNavigate();
@@ -45,8 +45,10 @@ export const CharacterSelect: React.FC = () => {
                 : 'border-gray-700 bg-gray-800 hover:bg-gray-750 hover:border-gray-500'}
           `}
         >
-          <div className="text-6xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-             🍄
+          <div className="w-24 h-24 mb-4 transform group-hover:scale-110 transition-transform duration-300">
+             <svg viewBox="0 0 32 32" className="w-full h-full drop-shadow-md">
+                 <SvgMario />
+             </svg>
           </div>
           <h2 className="text-2xl font-bold mb-2">Mario</h2>
           <p className="text-gray-400 text-sm px-4 text-center">
@@ -70,8 +72,10 @@ export const CharacterSelect: React.FC = () => {
                 : 'border-gray-700 bg-gray-800 hover:bg-gray-750 hover:border-gray-500'}
           `}
         >
-          <div className="text-6xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-             🐵
+          <div className="w-24 h-24 mb-4 transform group-hover:scale-110 transition-transform duration-300">
+             <svg viewBox="0 0 32 32" className="w-full h-full drop-shadow-md">
+                 <SvgWukong />
+             </svg>
           </div>
           <h2 className="text-2xl font-bold mb-2">Sun Wukong</h2>
           <p className="text-gray-400 text-sm px-4 text-center">

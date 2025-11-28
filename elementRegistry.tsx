@@ -4,7 +4,8 @@ import { ElementConfig } from './types';
 import { 
     SvgGround, SvgBrick, SvgHardBlock, SvgQuestionBlock, SvgInvisibleDeathBlock, SvgEmptyBlock,
     SvgGoomba, SvgTurtle, SvgPiranhaPlant, SvgPopUpSpike, SvgRotatingSpike,
-    SvgCoin, SvgMushroom, SvgFireMushroom, SvgCloud, SvgBullet, SvgPlayerStart, SvgFlagpole, SvgTextDecoration
+    SvgCoin, SvgMushroom, SvgFireMushroom, SvgCloud, SvgBullet, SvgPlayerStart, SvgFlagpole, SvgTextDecoration,
+    SvgMario
 } from './elementSVGs';
 
 export interface RegistryItem extends ElementConfig {
@@ -387,7 +388,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     category: 'trigger',
     color: 0x00FF00,
     attributes: { gravity: false },
-    renderSVG: () => <SvgPlayerStart />,
+    // Use Mario SVG for the player start icon instead of generic 'S'
+    renderSVG: () => <SvgMario />,
     renderPixi: (g, _l, x, y, w, h) => {
         g.rect(x + 4, y + 4, w - 8, h - 8).stroke({ width: 2, color: 0x00FF00 });
         // S for start
