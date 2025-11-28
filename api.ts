@@ -164,8 +164,9 @@ export const saveMap = async (data: MapIn, token: string): Promise<SaveMapRespon
    return json.data; // Expected { data: { map_id: 3 } }
 };
 
-export const getMyMaps = async (token: string): Promise<MapListItem[]> => {
-   const res = await fetch(`${API_BASE}/my_maps`, {
+export const getMyMaps = async (token: string, status?: number): Promise<MapListItem[]> => {
+   const url = status !== undefined ? `${API_BASE}/my_maps?status=${status}` : `${API_BASE}/my_maps`;
+   const res = await fetch(url, {
      method: 'GET',
      headers: getHeaders(token)
    });

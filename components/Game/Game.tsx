@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
@@ -124,7 +125,8 @@ export const Game: React.FC<GameProps> = ({
           const token = localStorage.getItem('access_token');
           if (token) {
               setIsLoadingMaps(true);
-              getMyMaps(token)
+              // Pass status=1 to fetch only normal/active maps
+              getMyMaps(token, 1)
                 .then(setMyMaps)
                 .catch(err => console.error("Failed to load maps", err))
                 .finally(() => setIsLoadingMaps(false));
@@ -1128,7 +1130,9 @@ export const Game: React.FC<GameProps> = ({
                                    <div key={map.id} className="group bg-gray-700 p-1 rounded flex items-center justify-between border border-gray-600 hover:border-blue-500 transition-all pr-2">
                                        <button onClick={() => handleLoadFromApi(map.id)} className="flex-1 p-2 text-left hover:bg-gray-600 rounded mr-2">
                                            <div className="flex flex-col items-start">
-                                               <span className="font-bold text-sm text-white group-hover:text-blue-300">Map #{map.id}</span>
+                                               <span className="font-bold text-sm text-white group-hover:text-blue-300">
+                                                   {map.title ? map.title : `Map #${map.id}`}
+                                               </span>
                                                <span className="text-[10px] text-gray-400">
                                                    Status: {map.is_public ? 'Published' : 'Draft'}
                                                </span>
