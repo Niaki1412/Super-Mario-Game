@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
@@ -5,8 +6,8 @@ import { GameMap, Entity, Particle } from '../../types';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
-import { getMyMaps, getMapById, deleteMap, MapListItem } from '../../api';
-import { Cloud, Trash2 } from 'lucide-react';
+import { getMyMaps, getMapById, MapListItem } from '../../api';
+import { Cloud } from 'lucide-react';
 
 const DEFAULT_CONTROLS = {
     left: 'a',
@@ -1099,20 +1100,6 @@ export const Game: React.FC<GameProps> = ({
       }
   };
 
-  const handleDeleteMap = async (e: React.MouseEvent, id: number) => {
-      e.stopPropagation(); 
-      if (!window.confirm("Are you sure you want to delete this map? This cannot be undone.")) return;
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
-      try {
-          await deleteMap({ map_id: id }, token);
-          setMyMaps(prev => prev.filter(m => m.id !== id));
-      } catch (error) {
-          console.error("Failed to delete map", error);
-          alert("Failed to delete map");
-      }
-  };
-
   const handleExit = () => {
       if (onClose) onClose(); else navigate('/');
   };
@@ -1146,9 +1133,6 @@ export const Game: React.FC<GameProps> = ({
                                                    Status: {map.is_public ? 'Published' : 'Draft'}
                                                </span>
                                            </div>
-                                       </button>
-                                       <button onClick={(e) => handleDeleteMap(e, map.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded transition-colors" title="Delete Map">
-                                          <Trash2 size={16} />
                                        </button>
                                    </div>
                                ))}
