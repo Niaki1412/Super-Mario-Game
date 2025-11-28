@@ -70,6 +70,7 @@ export const UserBar: React.FC = () => {
       localStorage.setItem('access_token', res.access_token);
       localStorage.setItem('username', formData.username);
       setUser({ username: formData.username, token: res.access_token });
+      window.dispatchEvent(new Event('auth-change'));
       clearForms();
     } catch (err: any) {
       setError(err.message);
@@ -105,6 +106,7 @@ export const UserBar: React.FC = () => {
     localStorage.removeItem('username');
     setUser(null);
     setShowProfilePopover(false);
+    window.dispatchEvent(new Event('auth-change'));
   };
 
   const toggleProfile = async () => {

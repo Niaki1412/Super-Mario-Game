@@ -1,18 +1,27 @@
 
 import React, { useEffect, useState } from 'react';
-import { Gamepad2, PenTool, Globe, UserCircle2 } from 'lucide-react';
+import { Gamepad2, PenTool, Globe, UserCircle2, FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CHARACTERS } from '../../playerConfig';
 
 export const MainMenu: React.FC = () => {
   const navigate = useNavigate();
   const [charName, setCharName] = useState('Mario');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
       const saved = localStorage.getItem('SELECTED_CHARACTER');
       if (saved && CHARACTERS[saved as keyof typeof CHARACTERS]) {
           setCharName(CHARACTERS[saved as keyof typeof CHARACTERS].name);
       }
+
+      const checkAuth = () => {
+        setIsLoggedIn(!!localStorage.getItem('access_token'));
+      };
+      
+      checkAuth();
+      window.addEventListener('auth-change', checkAuth);
+      return () => window.removeEventListener('auth-change', checkAuth);
   }, []);
 
   return (
@@ -24,7 +33,7 @@ export const MainMenu: React.FC = () => {
         <p className="text-gray-400 text-xl">Build. Play. Share.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full max-w-6xl px-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-6 w-full max-w-7xl px-4">
         
         {/* Character Select */}
         <button 
@@ -81,6 +90,22 @@ export const MainMenu: React.FC = () => {
             Load local JSON files.
           </p>
         </button>
+
+        {/* My Maps (Conditional) */}
+        {isLoggedIn && (
+            <button 
+            onClick={() => navigate('/my_maps')}
+            className="group relative bg-gray-800 rounded-3xl p-6 hover:bg-gray-750 border-2 border-gray-700 hover:border-green-500 transition-all duration-300 flex flex-col items-center hover:-translate-y-2 hover:shadow-2xl hover:shadow-green-500/20"
+            >
+            <div className="bg-green-900/30 p-6 rounded-full mb-6 group-hover:bg-green-600 group-hover:text-white transition-colors text-green-400 ring-4 ring-green-900/20">
+                <FolderOpen size={40} />
+            </div>
+            <h2 className="text-xl font-bold mb-2">My Maps</h2>
+            <p className="text-gray-400 text-center text-xs">
+                Manage your creations.
+            </p>
+            </button>
+        )}
       </div>
 
       <div className="mt-16 text-gray-600 text-xs">

@@ -82,7 +82,7 @@ export const GameCenter: React.FC = () => {
                 >
                   {/* Cover Image */}
                   <div className="relative h-48 bg-gray-800 overflow-hidden">
-                    {map.cover && map.cover !== "暂无封面" && (map.cover.startsWith('http') || map.cover.startsWith('data:')) ? (
+                    {map.cover && map.cover !== "暂无封面" ?(
                       <img 
                         src={map.cover} 
                         alt={map.title} 
