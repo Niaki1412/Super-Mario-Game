@@ -69,10 +69,13 @@ export const Editor: React.FC = () => {
       const clone = JSON.parse(JSON.stringify(data));
       if (clone.customImages && Array.isArray(clone.customImages)) {
           clone.customImages = clone.customImages.map((img: any) => {
-              // If it's a data URI (base64), strip it to save space/bandwidth
-              // We assume images should be uploaded and have URL references
-              if (img.data && typeof img.data === 'string' && img.data.trim().startsWith('data:')) {
-                  return { ...img, data: "" }; 
+              const strData = img.data || "";
+              // Strictly remove any data that looks like Base64 (starts with data:) OR is too long (> 512 chars).
+              // URLs are typically short. Base64 is typically huge.
+              if (typeof strData === 'string') {
+                  if (strData.trim().startsWith('data:') || strData.length > 512) {
+                       return { ...img, data: "" };
+                  }
               }
               return img;
           });
@@ -597,4 +600,3 @@ export const Editor: React.FC = () => {
     </div>
   );
 };
-    
