@@ -156,11 +156,19 @@ export const saveMap = async (data: MapIn, token: string): Promise<SaveMapRespon
      headers: getHeaders(token),
      body: JSON.stringify(data)
    });
+   
    if (!res.ok) {
        const err = await res.json();
        throw new Error(err.detail || 'Failed to save map');
    }
+
    const json = await res.json();
+
+   // Check for application-level logic errors (e.g. code -1)
+   if (json.code !== undefined && json.code !== 0) {
+       throw new Error(json.message || 'Failed to save map');
+   }
+
    return json.data; // Expected { data: { map_id: 3 } }
 };
 
