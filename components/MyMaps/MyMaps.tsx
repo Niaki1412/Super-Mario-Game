@@ -90,9 +90,9 @@ export const MyMaps: React.FC = () => {
 
   // --- Publish Logic ---
   
-  const openPublishModal = (id: number) => {
+  const openPublishModal = (id: number, currentTitle?: string) => {
       setSelectedMapId(id);
-      setPublishForm({ title: `Map #${id}`, description: '' });
+      setPublishForm({ title: currentTitle || `Map #${id}`, description: '' });
       setCoverFile(null);
       setCoverPreview(null);
       setPublishModalOpen(true);
@@ -207,7 +207,7 @@ export const MyMaps: React.FC = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-700">
-                                    <th className="p-5 font-semibold">Map ID</th>
+                                    <th className="p-5 font-semibold">Map Name / ID</th>
                                     <th className="p-5 font-semibold">Status</th>
                                     <th className="p-5 font-semibold">Visibility</th>
                                     <th className="p-5 font-semibold text-right">Actions</th>
@@ -221,7 +221,10 @@ export const MyMaps: React.FC = () => {
                                                 <div className="bg-gray-700 p-2 rounded-lg text-emerald-400">
                                                     <MapIcon size={20} />
                                                 </div>
-                                                <span className="font-mono text-lg font-bold text-gray-200">#{map.id}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-gray-200 text-lg">{map.title || 'Untitled Map'}</span>
+                                                    <span className="font-mono text-xs text-gray-500">ID: {map.id}</span>
+                                                </div>
                                             </div>
                                         </td>
                                         
@@ -260,7 +263,7 @@ export const MyMaps: React.FC = () => {
                                                 {map.status === 1 && (
                                                     <>
                                                         <button 
-                                                            onClick={() => openPublishModal(map.id)}
+                                                            onClick={() => openPublishModal(map.id, map.title)}
                                                             className="flex items-center gap-2 bg-purple-600/10 hover:bg-purple-600 hover:text-white text-purple-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-purple-600/20 hover:border-purple-600"
                                                             title="Publish to Game Center"
                                                         >

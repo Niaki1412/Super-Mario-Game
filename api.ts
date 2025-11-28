@@ -31,6 +31,7 @@ export interface MapIn {
   id?: number | null;
   map_data: string; // JSON string of GameMap
   is_public?: boolean;
+  title?: string;
 }
 
 // Response from /api/my_maps
@@ -39,6 +40,7 @@ export interface MapListItem {
   status: number;
   user_id: number;
   is_public: boolean;
+  title?: string;
 }
 
 export interface PublicMapListItem {
@@ -59,6 +61,7 @@ export interface MapDetail {
   status?: number;
   create_at?: string;
   update_at?: string;
+  title?: string;
 }
 
 // Specific response for Save Map endpoint

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AssetPalette } from './AssetPalette';
@@ -107,6 +108,7 @@ export const Editor: React.FC = () => {
                          // Ensure customImages is array
                          if (!json.customImages) json.customImages = [];
                          setMapData(json);
+                         if (cloudMap.title) setMapName(cloudMap.title);
                          setLastSaved(new Date());
                          showToast(`Map #${mapIdParam} loaded from cloud`, 'info');
                          return; 
@@ -173,7 +175,8 @@ export const Editor: React.FC = () => {
       const payload: MapIn = {
           id: idToSave,
           map_data: JSON.stringify(mapToSave),
-          is_public: false
+          is_public: false,
+          title: mapName
       };
 
       try {
