@@ -126,8 +126,9 @@ export const Game: React.FC<GameProps> = ({
           if (token) {
               setIsLoadingMaps(true);
               // Pass status=1 to fetch only normal/active maps
-              getMyMaps(token, 1)
-                .then(setMyMaps)
+              // Pass page=1, pageSize=-1 to get ALL active maps for the dropdown list
+              getMyMaps(token, 1, 1, -1)
+                .then((data) => setMyMaps(data.list))
                 .catch(err => console.error("Failed to load maps", err))
                 .finally(() => setIsLoadingMaps(false));
           }

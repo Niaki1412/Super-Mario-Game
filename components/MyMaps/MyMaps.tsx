@@ -3,13 +3,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem } from '../../api';
-import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, Eye, EyeOff, Activity, Ban, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, Eye, EyeOff, Activity, Ban, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
   const navigate = useNavigate();
   const [maps, setMaps] = useState<MapListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 10;
 
   // Toast State
   const [toast, setToast] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -30,13 +35,16 @@ export const MyMaps: React.FC = () => {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const fetchMaps = async () => {
+  const fetchMaps = async (page: number) => {
     const token = localStorage.getItem('access_token');
     if (!token) return;
     try {
       setLoading(true);
-      const data = await getMyMaps(token);
-      setMaps(data);
+      // Status -1 to get all maps (deleted and active)
+      const data = await getMyMaps(token, -1, page, pageSize);
+      setMaps(data.list);
+      setTotalPages(data.total_pages);
+      setCurrentPage(data.page);
     } catch (err) {
       console.error(err);
       setError('Failed to load maps.');
@@ -51,8 +59,8 @@ export const MyMaps: React.FC = () => {
       navigate('/');
       return;
     }
-    fetchMaps();
-  }, [navigate]);
+    fetchMaps(currentPage);
+  }, [navigate, currentPage]);
 
   const handleEdit = (id: number) => {
     navigate(`/editor?id=${id}`);
@@ -65,8 +73,8 @@ export const MyMaps: React.FC = () => {
 
     try {
       await deleteMap({ map_id: id }, token);
-      // Update local state to reflect status change immediately
-      setMaps(prev => prev.map(m => m.id === id ? { ...m, status: 0 } : m));
+      // Refresh to ensure consistent state
+      fetchMaps(currentPage);
       showToast('Map deleted successfully', 'success');
     } catch (err) {
       showToast('Failed to delete map', 'error');
@@ -80,8 +88,7 @@ export const MyMaps: React.FC = () => {
 
     try {
       await restoreMap({ map_id: id }, token);
-      // Update local state to reflect status change immediately
-      setMaps(prev => prev.map(m => m.id === id ? { ...m, status: 1 } : m));
+      fetchMaps(currentPage);
       showToast('Map restored successfully', 'success');
     } catch (err) {
       showToast('Failed to restore map', 'error');
@@ -138,7 +145,7 @@ export const MyMaps: React.FC = () => {
 
           showToast('Map published successfully!', 'success');
           closePublishModal();
-          fetchMaps(); // Refresh list to update status
+          fetchMaps(currentPage); 
       } catch (error) {
           console.error('Publish failed', error);
           showToast('Failed to publish map. Please try again.', 'error');
@@ -202,106 +209,129 @@ export const MyMaps: React.FC = () => {
                      <p className="text-sm">Create your first map in the Editor!</p>
                  </div>
              ) : (
-                 <div className="bg-gray-800 rounded-xl border border-gray-700 shadow-xl overflow-hidden">
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-700">
-                                    <th className="p-5 font-semibold">Map Name / ID</th>
-                                    <th className="p-5 font-semibold">Status</th>
-                                    <th className="p-5 font-semibold">Visibility</th>
-                                    <th className="p-5 font-semibold text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-700">
-                                {maps.map((map) => (
-                                    <tr key={map.id} className="hover:bg-gray-700/30 transition-colors">
-                                        <td className="p-5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-gray-700 p-2 rounded-lg text-emerald-400">
-                                                    <MapIcon size={20} />
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-gray-200 text-lg">{map.title || 'Untitled Map'}</span>
-                                                    <span className="font-mono text-xs text-gray-500">ID: {map.id}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        
-                                        {/* Status Column */}
-                                        <td className="p-5">
-                                            {map.status === 1 ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                                    <Activity size={12} />
-                                                    Normal
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-red-500/10 text-red-400 border-red-500/20">
-                                                    <Ban size={12} />
-                                                    Deleted
-                                                </span>
-                                            )}
-                                        </td>
-
-                                        {/* Visibility Column */}
-                                        <td className="p-5">
-                                            {map.is_public ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-purple-500/10 text-purple-400 border-purple-500/20">
-                                                    <Globe size={12} />
-                                                    Published
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-gray-500/10 text-gray-400 border-gray-500/20">
-                                                    <EyeOff size={12} />
-                                                    Draft
-                                                </span>
-                                            )}
-                                        </td>
-
-                                        <td className="p-5">
-                                            <div className="flex justify-end items-center gap-3">
-                                                {map.status === 1 && (
-                                                    <>
-                                                        <button 
-                                                            onClick={() => openPublishModal(map.id, map.title)}
-                                                            className="flex items-center gap-2 bg-purple-600/10 hover:bg-purple-600 hover:text-white text-purple-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-purple-600/20 hover:border-purple-600"
-                                                            title="Publish to Game Center"
-                                                        >
-                                                            <Globe size={14} />
-                                                            Publish
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleEdit(map.id)}
-                                                            className="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-blue-600/20 hover:border-blue-600"
-                                                        >
-                                                            <Edit size={14} />
-                                                            Edit
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDelete(map.id)}
-                                                            className="flex items-center gap-2 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-red-600/20 hover:border-red-600"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                            Delete
-                                                        </button>
-                                                    </>
-                                                )}
-                                                {map.status === 0 && (
-                                                    <button 
-                                                        onClick={() => handleRestore(map.id)}
-                                                        className="flex items-center gap-2 bg-green-600/10 hover:bg-green-600 hover:text-white text-green-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-green-600/20 hover:border-green-600"
-                                                        title="Restore Map"
-                                                    >
-                                                        <RotateCcw size={14} />
-                                                        Restore
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
+                 <div className="flex flex-col gap-4">
+                     <div className="bg-gray-800 rounded-xl border border-gray-700 shadow-xl overflow-hidden">
+                         <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-700">
+                                        <th className="p-5 font-semibold">Map Name / ID</th>
+                                        <th className="p-5 font-semibold">Status</th>
+                                        <th className="p-5 font-semibold">Visibility</th>
+                                        <th className="p-5 font-semibold text-right">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-700">
+                                    {maps.map((map) => (
+                                        <tr key={map.id} className="hover:bg-gray-700/30 transition-colors">
+                                            <td className="p-5">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-gray-700 p-2 rounded-lg text-emerald-400">
+                                                        <MapIcon size={20} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-gray-200 text-lg">{map.title || 'Untitled Map'}</span>
+                                                        <span className="font-mono text-xs text-gray-500">ID: {map.id}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            
+                                            {/* Status Column */}
+                                            <td className="p-5">
+                                                {map.status === 1 ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                                        <Activity size={12} />
+                                                        Normal
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-red-500/10 text-red-400 border-red-500/20">
+                                                        <Ban size={12} />
+                                                        Deleted
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            {/* Visibility Column */}
+                                            <td className="p-5">
+                                                {map.is_public ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-purple-500/10 text-purple-400 border-purple-500/20">
+                                                        <Globe size={12} />
+                                                        Published
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-gray-500/10 text-gray-400 border-gray-500/20">
+                                                        <EyeOff size={12} />
+                                                        Draft
+                                                    </span>
+                                                )}
+                                            </td>
+
+                                            <td className="p-5">
+                                                <div className="flex justify-end items-center gap-3">
+                                                    {map.status === 1 && (
+                                                        <>
+                                                            <button 
+                                                                onClick={() => openPublishModal(map.id, map.title)}
+                                                                className="flex items-center gap-2 bg-purple-600/10 hover:bg-purple-600 hover:text-white text-purple-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-purple-600/20 hover:border-purple-600"
+                                                                title="Publish to Game Center"
+                                                            >
+                                                                <Globe size={14} />
+                                                                Publish
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleEdit(map.id)}
+                                                                className="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-blue-600/20 hover:border-blue-600"
+                                                            >
+                                                                <Edit size={14} />
+                                                                Edit
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDelete(map.id)}
+                                                                className="flex items-center gap-2 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-red-600/20 hover:border-red-600"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                                Delete
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {map.status === 0 && (
+                                                        <button 
+                                                            onClick={() => handleRestore(map.id)}
+                                                            className="flex items-center gap-2 bg-green-600/10 hover:bg-green-600 hover:text-white text-green-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-green-600/20 hover:border-green-600"
+                                                            title="Restore Map"
+                                                        >
+                                                            <RotateCcw size={14} />
+                                                            Restore
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                         </div>
+                     </div>
+
+                     {/* Pagination Controls */}
+                     <div className="flex items-center justify-end gap-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
+                         <button 
+                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                             disabled={currentPage <= 1}
+                             className="p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                         >
+                             <ChevronLeft size={20} />
+                         </button>
+                         <span className="text-sm font-mono text-gray-400">
+                             Page <span className="text-white font-bold">{currentPage}</span> of <span className="text-white font-bold">{totalPages}</span>
+                         </span>
+                         <button 
+                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                             disabled={currentPage >= totalPages}
+                             className="p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                         >
+                             <ChevronRight size={20} />
+                         </button>
                      </div>
                  </div>
              )}

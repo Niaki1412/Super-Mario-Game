@@ -34,13 +34,22 @@ export interface MapIn {
   title?: string;
 }
 
-// Response from /api/my_maps
+// Response from /api/my_maps (Item)
 export interface MapListItem {
   id: number;
   status: number;
   user_id: number;
   is_public: boolean;
   title?: string;
+}
+
+// Pagination wrapper for Map List
+export interface MapPaginationData {
+    list: MapListItem[];
+    total_pages: number;
+    total_count: number;
+    page: number;
+    page_size: number;
 }
 
 export interface PublicMapListItem {
@@ -172,15 +181,20 @@ export const saveMap = async (data: MapIn, token: string): Promise<SaveMapRespon
    return json.data; // Expected { data: { map_id: 3 } }
 };
 
-export const getMyMaps = async (token: string, status?: number): Promise<MapListItem[]> => {
-   const url = status !== undefined ? `${API_BASE}/my_maps?status=${status}` : `${API_BASE}/my_maps`;
+export const getMyMaps = async (token: string, status?: number, page: number = 1, pageSize: number = 10): Promise<MapPaginationData> => {
+   const params = new URLSearchParams();
+   if (status !== undefined) params.append('status', status.toString());
+   params.append('page', page.toString());
+   params.append('page_size', pageSize.toString());
+
+   const url = `${API_BASE}/my_maps?${params.toString()}`;
    const res = await fetch(url, {
      method: 'GET',
      headers: getHeaders(token)
    });
    if (!res.ok) throw new Error('Failed to fetch maps');
    const json = await res.json();
-   // Expecting structure { data: [...], ... }
+   // Expecting structure { data: { list: [], total_pages: ... }, ... }
    return json.data; 
 };
 
