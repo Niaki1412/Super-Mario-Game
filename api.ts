@@ -1,4 +1,5 @@
 
+
 export const API_BASE = '/api';
 
 export interface UserCreate {
@@ -74,6 +75,10 @@ export interface UploadResponse {
 export type MapOut = MapDetail;
 
 export interface DeleteIn {
+  map_id: number;
+}
+
+export interface RestoreIn {
   map_id: number;
 }
 
@@ -184,6 +189,15 @@ export const deleteMap = async (data: DeleteIn, token: string): Promise<void> =>
      body: JSON.stringify(data)
    });
    if (!res.ok) throw new Error('Failed to delete map');
+};
+
+export const restoreMap = async (data: RestoreIn, token: string): Promise<void> => {
+  const res = await fetch(`${API_BASE}/map/restore`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Failed to restore map');
 };
 
 export const getPublicMaps = async (): Promise<PublicMapListItem[]> => {

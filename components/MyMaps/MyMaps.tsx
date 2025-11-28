@@ -1,8 +1,9 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMyMaps, deleteMap, publishMap, uploadFile, MapListItem } from '../../api';
-import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, Eye, EyeOff, Activity, Ban } from 'lucide-react';
+import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem } from '../../api';
+import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, Eye, EyeOff, Activity, Ban, RotateCcw } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
   const navigate = useNavigate();
@@ -64,13 +65,26 @@ export const MyMaps: React.FC = () => {
 
     try {
       await deleteMap({ map_id: id }, token);
-      // Update local state to reflect status change immediately, or refetch
-      // Usually "Deleted" means status becomes 0. If API deletes row, we filter. 
-      // Assuming soft delete based on prompt "status 0 means delete".
+      // Update local state to reflect status change immediately
       setMaps(prev => prev.map(m => m.id === id ? { ...m, status: 0 } : m));
       showToast('Map deleted successfully', 'success');
     } catch (err) {
       showToast('Failed to delete map', 'error');
+    }
+  };
+
+  const handleRestore = async (id: number) => {
+    if (!window.confirm('Are you sure you want to restore this map?')) return;
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    try {
+      await restoreMap({ map_id: id }, token);
+      // Update local state to reflect status change immediately
+      setMaps(prev => prev.map(m => m.id === id ? { ...m, status: 1 } : m));
+      showToast('Map restored successfully', 'success');
+    } catch (err) {
+      showToast('Failed to restore map', 'error');
     }
   };
 
@@ -270,7 +284,14 @@ export const MyMaps: React.FC = () => {
                                                     </>
                                                 )}
                                                 {map.status === 0 && (
-                                                    <span className="text-gray-500 text-xs italic">Read only</span>
+                                                    <button 
+                                                        onClick={() => handleRestore(map.id)}
+                                                        className="flex items-center gap-2 bg-green-600/10 hover:bg-green-600 hover:text-white text-green-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-green-600/20 hover:border-green-600"
+                                                        title="Restore Map"
+                                                    >
+                                                        <RotateCcw size={14} />
+                                                        Restore
+                                                    </button>
                                                 )}
                                             </div>
                                         </td>
