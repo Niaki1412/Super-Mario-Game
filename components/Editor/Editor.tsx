@@ -400,7 +400,20 @@ export const Editor: React.FC = () => {
   };
 
   const handleExport = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(mapData, null, 2));
+    // Clone mapData for modification
+    const exportMap = JSON.parse(JSON.stringify(mapData));
+
+    // Sanitize customImages to remove base64 strings if present
+    if (exportMap.customImages && Array.isArray(exportMap.customImages)) {
+        exportMap.customImages = exportMap.customImages.map((img: any) => {
+            if (img.data && typeof img.data === 'string' && img.data.startsWith('data:')) {
+                return { ...img, data: "" }; // Clear base64 data
+            }
+            return img;
+        });
+    }
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportMap, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
     const fileName = mapName.trim() ? (mapName.endsWith('.json') ? mapName : `${mapName}.json`) : 'mario_map.json';
