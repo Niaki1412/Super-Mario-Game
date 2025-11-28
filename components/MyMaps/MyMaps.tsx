@@ -2,13 +2,24 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyMaps, deleteMap, publishMap, uploadFile, MapListItem } from '../../api';
-import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
   const navigate = useNavigate();
   const [maps, setMaps] = useState<MapListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Toast State
+  const [toast, setToast] = useState<{ id: number; message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+      const id = Date.now();
+      setToast({ id, message, type });
+      setTimeout(() => {
+          setToast(current => current?.id === id ? null : current);
+      }, 3000);
+  };
 
   // Publish Modal State
   const [isPublishModalOpen, setPublishModalOpen] = useState(false);
@@ -54,8 +65,9 @@ export const MyMaps: React.FC = () => {
     try {
       await deleteMap({ map_id: id }, token);
       setMaps(prev => prev.filter(m => m.id !== id));
+      showToast('Map deleted successfully', 'success');
     } catch (err) {
-      alert('Failed to delete map');
+      showToast('Failed to delete map', 'error');
     }
   };
 
@@ -107,19 +119,35 @@ export const MyMaps: React.FC = () => {
               cover: coverUrl
           }, token);
 
-          alert('Map published successfully!');
+          showToast('Map published successfully!', 'success');
           closePublishModal();
           fetchMaps(); // Refresh list to update status
       } catch (error) {
           console.error('Publish failed', error);
-          alert('Failed to publish map. Please try again.');
+          showToast('Failed to publish map. Please try again.', 'error');
       } finally {
           setIsPublishing(false);
       }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col font-sans relative">
+      {/* Toast Notification */}
+      {toast && (
+          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 pointer-events-none">
+              <div className={`
+                  flex items-center gap-3 px-6 py-3 rounded-full shadow-2xl border border-white/10 backdrop-blur-md
+                  ${toast.type === 'success' ? 'bg-green-900/90 text-green-100' : 
+                    toast.type === 'error' ? 'bg-red-900/90 text-red-100' : 
+                    'bg-blue-900/90 text-blue-100'}
+              `}>
+                  {toast.type === 'success' && <CheckCircle size={20} className="text-green-400" />}
+                  {toast.type === 'error' && <AlertTriangle size={20} className="text-red-400" />}
+                  <span className="font-semibold text-sm">{toast.message}</span>
+              </div>
+          </div>
+      )}
+
       <div className="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-10 flex items-center justify-between shadow-md">
         <button 
             onClick={() => navigate('/')}
