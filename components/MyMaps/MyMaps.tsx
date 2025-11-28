@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem } from '../../api';
@@ -42,9 +41,10 @@ export const MyMaps: React.FC = () => {
       setLoading(true);
       // Status -1 to get all maps (deleted and active)
       const data = await getMyMaps(token, -1, page, pageSize);
-      setMaps(data.list);
-      setTotalPages(data.total_pages);
-      setCurrentPage(data.page);
+      // Safety check for list
+      setMaps(data.list || []);
+      setTotalPages(data.total_pages || 1);
+      setCurrentPage(data.page || 1);
     } catch (err) {
       console.error(err);
       setError('Failed to load maps.');
@@ -155,7 +155,7 @@ export const MyMaps: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col font-sans relative">
+    <div className="h-screen bg-gray-900 text-white flex flex-col font-sans overflow-hidden">
       {/* Toast Notification */}
       {toast && (
           <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 pointer-events-none">
@@ -172,7 +172,8 @@ export const MyMaps: React.FC = () => {
           </div>
       )}
 
-      <div className="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-10 flex items-center justify-between shadow-md">
+      {/* Header (Fixed) */}
+      <div className="shrink-0 bg-gray-900 border-b border-gray-800 p-4 z-10 flex items-center justify-between shadow-md">
         <button 
             onClick={() => navigate('/')}
             className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
@@ -192,7 +193,8 @@ export const MyMaps: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex-1 p-8 overflow-y-auto">
+      {/* Main Content (Scrollable) */}
+      <div className="flex-1 overflow-y-auto p-8 relative">
         <div className="max-w-6xl mx-auto">
              {loading ? (
                 <div className="flex justify-center mt-20">
@@ -312,31 +314,35 @@ export const MyMaps: React.FC = () => {
                             </table>
                          </div>
                      </div>
-
-                     {/* Pagination Controls */}
-                     <div className="flex items-center justify-end gap-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
-                         <button 
-                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                             disabled={currentPage <= 1}
-                             className="p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                         >
-                             <ChevronLeft size={20} />
-                         </button>
-                         <span className="text-sm font-mono text-gray-400">
-                             Page <span className="text-white font-bold">{currentPage}</span> of <span className="text-white font-bold">{totalPages}</span>
-                         </span>
-                         <button 
-                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                             disabled={currentPage >= totalPages}
-                             className="p-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                         >
-                             <ChevronRight size={20} />
-                         </button>
-                     </div>
                  </div>
              )}
         </div>
       </div>
+
+      {/* Footer Pagination (Fixed) */}
+      {!loading && !error && maps.length > 0 && (
+          <div className="shrink-0 p-4 bg-gray-800 border-t border-gray-700 flex items-center justify-end shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20">
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white border border-gray-600"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    <span className="text-sm font-mono text-gray-400">
+                        Page <span className="text-white font-bold">{currentPage}</span> of <span className="text-white font-bold">{totalPages}</span>
+                    </span>
+                    <button 
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                        className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white border border-gray-600"
+                    >
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
+          </div>
+      )}
 
       {/* PUBLISH MODAL */}
       {isPublishModalOpen && (
