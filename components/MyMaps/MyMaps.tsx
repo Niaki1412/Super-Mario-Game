@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyMaps, deleteMap, publishMap, uploadFile, MapListItem } from '../../api';
-import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, Eye, EyeOff, Activity, Ban } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
   const navigate = useNavigate();
@@ -64,7 +64,10 @@ export const MyMaps: React.FC = () => {
 
     try {
       await deleteMap({ map_id: id }, token);
-      setMaps(prev => prev.filter(m => m.id !== id));
+      // Update local state to reflect status change immediately, or refetch
+      // Usually "Deleted" means status becomes 0. If API deletes row, we filter. 
+      // Assuming soft delete based on prompt "status 0 means delete".
+      setMaps(prev => prev.map(m => m.id === id ? { ...m, status: 0 } : m));
       showToast('Map deleted successfully', 'success');
     } catch (err) {
       showToast('Failed to delete map', 'error');
@@ -192,6 +195,7 @@ export const MyMaps: React.FC = () => {
                                 <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-700">
                                     <th className="p-5 font-semibold">Map ID</th>
                                     <th className="p-5 font-semibold">Status</th>
+                                    <th className="p-5 font-semibold">Visibility</th>
                                     <th className="p-5 font-semibold text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -206,48 +210,68 @@ export const MyMaps: React.FC = () => {
                                                 <span className="font-mono text-lg font-bold text-gray-200">#{map.id}</span>
                                             </div>
                                         </td>
+                                        
+                                        {/* Status Column */}
                                         <td className="p-5">
-                                            {map.status === 0 ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-red-500/10 text-red-400 border-red-500/20">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
-                                                    Deleted
+                                            {map.status === 1 ? (
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                                    <Activity size={12} />
+                                                    Normal
                                                 </span>
                                             ) : (
-                                                <span className={`
-                                                    inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border
-                                                    ${map.is_public 
-                                                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                                                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}
-                                                `}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${map.is_public ? 'bg-green-400' : 'bg-yellow-400'}`}></span>
-                                                    {map.is_public ? 'Published' : 'Draft'}
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-red-500/10 text-red-400 border-red-500/20">
+                                                    <Ban size={12} />
+                                                    Deleted
                                                 </span>
                                             )}
                                         </td>
+
+                                        {/* Visibility Column */}
+                                        <td className="p-5">
+                                            {map.is_public ? (
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-purple-500/10 text-purple-400 border-purple-500/20">
+                                                    <Globe size={12} />
+                                                    Published
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-gray-500/10 text-gray-400 border-gray-500/20">
+                                                    <EyeOff size={12} />
+                                                    Draft
+                                                </span>
+                                            )}
+                                        </td>
+
                                         <td className="p-5">
                                             <div className="flex justify-end items-center gap-3">
-                                                <button 
-                                                    onClick={() => openPublishModal(map.id)}
-                                                    className="flex items-center gap-2 bg-purple-600/10 hover:bg-purple-600 hover:text-white text-purple-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-purple-600/20 hover:border-purple-600"
-                                                    title="Publish to Game Center"
-                                                >
-                                                    <Globe size={14} />
-                                                    Publish
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleEdit(map.id)}
-                                                    className="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-blue-600/20 hover:border-blue-600"
-                                                >
-                                                    <Edit size={14} />
-                                                    Edit
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDelete(map.id)}
-                                                    className="flex items-center gap-2 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-red-600/20 hover:border-red-600"
-                                                >
-                                                    <Trash2 size={14} />
-                                                    Delete
-                                                </button>
+                                                {map.status === 1 && (
+                                                    <>
+                                                        <button 
+                                                            onClick={() => openPublishModal(map.id)}
+                                                            className="flex items-center gap-2 bg-purple-600/10 hover:bg-purple-600 hover:text-white text-purple-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-purple-600/20 hover:border-purple-600"
+                                                            title="Publish to Game Center"
+                                                        >
+                                                            <Globe size={14} />
+                                                            Publish
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleEdit(map.id)}
+                                                            className="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-blue-600/20 hover:border-blue-600"
+                                                        >
+                                                            <Edit size={14} />
+                                                            Edit
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDelete(map.id)}
+                                                            className="flex items-center gap-2 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-red-600/20 hover:border-red-600"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                            Delete
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {map.status === 0 && (
+                                                    <span className="text-gray-500 text-xs italic">Read only</span>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
