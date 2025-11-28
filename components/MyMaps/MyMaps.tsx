@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMyMaps, deleteMap, MapListItem } from '../../api';
-import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus } from 'lucide-react';
+import { getMyMaps, deleteMap, publishMap, uploadFile, MapListItem } from '../../api';
+import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
   const navigate = useNavigate();
@@ -10,25 +10,35 @@ export const MyMaps: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Publish Modal State
+  const [isPublishModalOpen, setPublishModalOpen] = useState(false);
+  const [selectedMapId, setSelectedMapId] = useState<number | null>(null);
+  const [publishForm, setPublishForm] = useState({ title: '', description: '' });
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const fetchMaps = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      setLoading(true);
+      const data = await getMyMaps(token);
+      setMaps(data);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load maps.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (!token) {
       navigate('/');
       return;
     }
-
-    const fetchMaps = async () => {
-      try {
-        const data = await getMyMaps(token);
-        setMaps(data);
-      } catch (err) {
-        console.error(err);
-        setError('Failed to load maps.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchMaps();
   }, [navigate]);
 
@@ -47,6 +57,65 @@ export const MyMaps: React.FC = () => {
     } catch (err) {
       alert('Failed to delete map');
     }
+  };
+
+  // --- Publish Logic ---
+  
+  const openPublishModal = (id: number) => {
+      setSelectedMapId(id);
+      setPublishForm({ title: `Map #${id}`, description: '' });
+      setCoverFile(null);
+      setCoverPreview(null);
+      setPublishModalOpen(true);
+  };
+
+  const closePublishModal = () => {
+      setPublishModalOpen(false);
+      setSelectedMapId(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          setCoverFile(file);
+          setCoverPreview(URL.createObjectURL(file));
+      }
+  };
+
+  const handlePublishSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedMapId) return;
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      setIsPublishing(true);
+
+      try {
+          let coverUrl = '';
+          
+          // 1. Upload Cover if exists
+          if (coverFile) {
+              const uploadRes = await uploadFile(coverFile, token);
+              coverUrl = uploadRes.url;
+          }
+
+          // 2. Publish Map
+          await publishMap({
+              map_id: selectedMapId,
+              title: publishForm.title,
+              description: publishForm.description,
+              cover: coverUrl
+          }, token);
+
+          alert('Map published successfully!');
+          closePublishModal();
+          fetchMaps(); // Refresh list to update status
+      } catch (error) {
+          console.error('Publish failed', error);
+          alert('Failed to publish map. Please try again.');
+      } finally {
+          setIsPublishing(false);
+      }
   };
 
   return (
@@ -88,43 +157,182 @@ export const MyMaps: React.FC = () => {
                      <p className="text-sm">Create your first map in the Editor!</p>
                  </div>
              ) : (
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                     {maps.map((map) => (
-                         <div key={map.id} className="bg-gray-800 border border-gray-700 rounded-xl p-6 hover:border-blue-500/50 transition-all shadow-lg flex flex-col">
-                             <div className="flex justify-between items-start mb-4">
-                                 <div className="bg-gray-700/50 p-3 rounded-lg text-emerald-400">
-                                     <MapIcon size={28} />
-                                 </div>
-                                 <div className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider border ${map.status === 1 ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-                                     {map.status === 1 ? 'Published' : 'Draft'}
-                                 </div>
-                             </div>
-                             
-                             <h3 className="text-xl font-bold text-gray-200 mb-1">Map #{map.id}</h3>
-                             <p className="text-xs text-gray-500 mb-6 font-mono">ID: {map.id}</p>
-                             
-                             <div className="mt-auto grid grid-cols-2 gap-3">
-                                 <button 
-                                    onClick={() => handleEdit(map.id)}
-                                    className="flex items-center justify-center gap-2 bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-400 py-2.5 rounded-lg text-sm font-bold transition-all border border-blue-600/20 hover:border-blue-600"
-                                 >
-                                     <Edit size={16} />
-                                     Edit
-                                 </button>
-                                 <button 
-                                    onClick={() => handleDelete(map.id)}
-                                    className="flex items-center justify-center gap-2 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-400 py-2.5 rounded-lg text-sm font-bold transition-all border border-red-600/20 hover:border-red-600"
-                                 >
-                                     <Trash2 size={16} />
-                                     Delete
-                                 </button>
-                             </div>
-                         </div>
-                     ))}
+                 <div className="bg-gray-800 rounded-xl border border-gray-700 shadow-xl overflow-hidden">
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-700">
+                                    <th className="p-5 font-semibold">Map ID</th>
+                                    <th className="p-5 font-semibold">Status</th>
+                                    <th className="p-5 font-semibold text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-700">
+                                {maps.map((map) => (
+                                    <tr key={map.id} className="hover:bg-gray-700/30 transition-colors">
+                                        <td className="p-5">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-gray-700 p-2 rounded-lg text-emerald-400">
+                                                    <MapIcon size={20} />
+                                                </div>
+                                                <span className="font-mono text-lg font-bold text-gray-200">#{map.id}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-5">
+                                             <span className={`
+                                                inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border
+                                                ${map.status === 1 
+                                                    ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}
+                                             `}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${map.status === 1 ? 'bg-green-400' : 'bg-yellow-400'}`}></span>
+                                                {map.status === 1 ? 'Published' : 'Draft'}
+                                             </span>
+                                        </td>
+                                        <td className="p-5">
+                                            <div className="flex justify-end items-center gap-3">
+                                                <button 
+                                                    onClick={() => openPublishModal(map.id)}
+                                                    className="flex items-center gap-2 bg-purple-600/10 hover:bg-purple-600 hover:text-white text-purple-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-purple-600/20 hover:border-purple-600"
+                                                    title="Publish to Game Center"
+                                                >
+                                                    <Globe size={14} />
+                                                    Publish
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleEdit(map.id)}
+                                                    className="flex items-center gap-2 bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-blue-600/20 hover:border-blue-600"
+                                                >
+                                                    <Edit size={14} />
+                                                    Edit
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDelete(map.id)}
+                                                    className="flex items-center gap-2 bg-red-600/10 hover:bg-red-600 hover:text-white text-red-400 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-red-600/20 hover:border-red-600"
+                                                >
+                                                    <Trash2 size={14} />
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                     </div>
                  </div>
              )}
         </div>
       </div>
+
+      {/* PUBLISH MODAL */}
+      {isPublishModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-[#1e1e1e] border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden relative flex flex-col max-h-[90vh]">
+                  {/* Header */}
+                  <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-gray-800/50">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-purple-900/30 rounded-lg text-purple-400">
+                              <Globe size={24} />
+                          </div>
+                          <div>
+                              <h2 className="text-xl font-bold text-white">Publish Map</h2>
+                              <p className="text-xs text-gray-400">Share your creation with the world</p>
+                          </div>
+                      </div>
+                      <button onClick={closePublishModal} className="text-gray-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors">
+                          <X size={20} />
+                      </button>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-6 overflow-y-auto custom-scrollbar">
+                      <form id="publishForm" onSubmit={handlePublishSubmit} className="space-y-6">
+                          <div>
+                              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Map Title</label>
+                              <input 
+                                  type="text" 
+                                  required
+                                  value={publishForm.title}
+                                  onChange={(e) => setPublishForm({...publishForm, title: e.target.value})}
+                                  className="w-full bg-black/20 border border-gray-600 rounded-lg p-3 text-white focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all placeholder-gray-600"
+                                  placeholder="e.g. Super Mario World 1-1"
+                              />
+                          </div>
+                          
+                          <div>
+                              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Description</label>
+                              <textarea 
+                                  rows={4}
+                                  value={publishForm.description}
+                                  onChange={(e) => setPublishForm({...publishForm, description: e.target.value})}
+                                  className="w-full bg-black/20 border border-gray-600 rounded-lg p-3 text-white focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all placeholder-gray-600 resize-none"
+                                  placeholder="Describe your level..."
+                              />
+                          </div>
+
+                          <div>
+                              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Cover Image</label>
+                              <div className="border-2 border-dashed border-gray-600 rounded-xl p-4 hover:border-gray-500 hover:bg-gray-800/50 transition-colors cursor-pointer group relative">
+                                  <input 
+                                      type="file" 
+                                      accept="image/*"
+                                      onChange={handleFileChange}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                  />
+                                  
+                                  {coverPreview ? (
+                                      <div className="relative h-40 w-full rounded-lg overflow-hidden">
+                                          <img src={coverPreview} alt="Cover Preview" className="w-full h-full object-cover" />
+                                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                              <span className="text-white text-sm font-bold flex items-center gap-2">
+                                                  <ImageIcon size={16} /> Change Image
+                                              </span>
+                                          </div>
+                                      </div>
+                                  ) : (
+                                      <div className="flex flex-col items-center justify-center py-8 text-gray-500 group-hover:text-gray-300">
+                                          <Upload size={32} className="mb-2" />
+                                          <span className="text-sm font-medium">Click to upload cover image</span>
+                                          <span className="text-xs opacity-50 mt-1">JPG, PNG supported</span>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      </form>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="p-4 border-t border-gray-700 bg-gray-800/50 flex justify-end gap-3">
+                      <button 
+                          type="button"
+                          onClick={closePublishModal}
+                          className="px-5 py-2.5 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg font-bold text-sm transition-colors"
+                      >
+                          Cancel
+                      </button>
+                      <button 
+                          type="submit"
+                          form="publishForm"
+                          disabled={isPublishing}
+                          className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          {isPublishing ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Publishing...
+                              </>
+                          ) : (
+                              <>
+                                <Globe size={16} />
+                                Confirm Publish
+                              </>
+                          )}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };
