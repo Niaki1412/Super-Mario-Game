@@ -67,6 +67,12 @@ export const Editor: React.FC = () => {
   // Helper to remove base64 data to keep payloads small
   const sanitizeMapData = useCallback((data: GameMap) => {
       const clone = JSON.parse(JSON.stringify(data));
+
+      // Explicitly remove backgroundImage if present as requested
+      if ('backgroundImage' in clone) {
+          delete (clone as any).backgroundImage;
+      }
+
       if (clone.customImages && Array.isArray(clone.customImages)) {
           clone.customImages = clone.customImages.map((img: any) => {
               const strData = img.data || "";
