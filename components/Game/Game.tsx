@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
@@ -1143,7 +1142,9 @@ export const Game: React.FC<GameProps> = ({
                                        <button onClick={() => handleLoadFromApi(map.id)} className="flex-1 p-2 text-left hover:bg-gray-600 rounded mr-2">
                                            <div className="flex flex-col items-start">
                                                <span className="font-bold text-sm text-white group-hover:text-blue-300">Map #{map.id}</span>
-                                               <span className="text-[10px] text-gray-400">Status: {map.status === 1 ? 'Active' : 'Draft'}</span>
+                                               <span className="text-[10px] text-gray-400">
+                                                   Status: {map.is_public ? 'Published' : 'Draft'}
+                                               </span>
                                            </div>
                                        </button>
                                        <button onClick={(e) => handleDeleteMap(e, map.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded transition-colors" title="Delete Map">

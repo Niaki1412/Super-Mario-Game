@@ -207,15 +207,22 @@ export const MyMaps: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="p-5">
-                                             <span className={`
-                                                inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border
-                                                ${map.status === 1 
-                                                    ? 'bg-green-500/10 text-green-400 border-green-500/20' 
-                                                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}
-                                             `}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${map.status === 1 ? 'bg-green-400' : 'bg-yellow-400'}`}></span>
-                                                {map.status === 1 ? 'Published' : 'Draft'}
-                                             </span>
+                                            {map.status === 0 ? (
+                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-red-500/10 text-red-400 border-red-500/20">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                                                    Deleted
+                                                </span>
+                                            ) : (
+                                                <span className={`
+                                                    inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border
+                                                    ${map.is_public 
+                                                        ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                                                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}
+                                                `}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${map.is_public ? 'bg-green-400' : 'bg-yellow-400'}`}></span>
+                                                    {map.is_public ? 'Published' : 'Draft'}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-5">
                                             <div className="flex justify-end items-center gap-3">

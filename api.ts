@@ -37,6 +37,7 @@ export interface MapListItem {
   id: number;
   status: number;
   user_id: number;
+  is_public: boolean;
 }
 
 export interface PublicMapListItem {
