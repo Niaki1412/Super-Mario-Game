@@ -26,8 +26,8 @@ export const GameCenter: React.FC = () => {
     fetchMaps();
   }, []);
 
-  const handlePlayMap = (mapId: number) => {
-    navigate(`/game?id=${mapId}`);
+  const handlePlayMap = (publicId: number) => {
+    navigate(`/game?public_id=${publicId}`);
   };
 
   return (
@@ -98,7 +98,7 @@ export const GameCenter: React.FC = () => {
                     {/* Hover Play Overlay */}
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
                         <button 
-                            onClick={() => handlePlayMap(map.map_id)}
+                            onClick={() => handlePlayMap(map.id)}
                             className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-full font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-all flex items-center gap-2"
                         >
                             <Gamepad2 size={20} />
@@ -119,7 +119,7 @@ export const GameCenter: React.FC = () => {
                             <Calendar size={12} />
                             <span>{new Date(map.create_at).toLocaleDateString()}</span>
                         </div>
-                        <span className="font-mono">ID: {map.map_id}</span>
+                        <span className="font-mono">ID: {map.id}</span>
                     </div>
                   </div>
                 </div>

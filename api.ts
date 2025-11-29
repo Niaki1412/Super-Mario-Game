@@ -1,5 +1,4 @@
 
-
 export const API_BASE = '/api';
 
 export interface UserCreate {
@@ -204,6 +203,16 @@ export const getMapById = async (id: number, token?: string | null): Promise<Map
         headers: getHeaders(token)
     });
     if (!res.ok) throw new Error('Failed to fetch map');
+    const json = await res.json();
+    return json.data;
+};
+
+export const getPublicMapById = async (public_map_id: number): Promise<MapDetail> => {
+    const res = await fetch(`${API_BASE}/public_map/${public_map_id}`, {
+        method: 'GET',
+        headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch public map');
     const json = await res.json();
     return json.data;
 };

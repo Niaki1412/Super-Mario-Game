@@ -6,7 +6,7 @@ import { GameMap, Entity, Particle } from '../../types';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
-import { getMyMaps, getMapById, MapListItem } from '../../api';
+import { getMyMaps, getMapById, getPublicMapById, MapListItem } from '../../api';
 import { Cloud, LogOut, RotateCcw } from 'lucide-react';
 
 const DEFAULT_CONTROLS = {
@@ -121,6 +121,13 @@ export const Game: React.FC<GameProps> = ({
 
   useEffect(() => {
       const mapIdParam = searchParams.get('id');
+      const publicIdParam = searchParams.get('public_id');
+
+      if (publicIdParam && !currentMap && !embedded) {
+          handleLoadPublicMap(Number(publicIdParam));
+          return;
+      }
+      
       if (mapIdParam && !currentMap && !embedded) {
           handleLoadFromApi(Number(mapIdParam), true); 
       }
@@ -1136,6 +1143,29 @@ export const Game: React.FC<GameProps> = ({
           console.error(e);
           alert("Failed to load map from cloud");
       }
+  };
+
+  const handleLoadPublicMap = async (id: number) => {
+    try {
+        const mapData = await getPublicMapById(id);
+        if (mapData.map_data) {
+            let json;
+            if (typeof mapData.map_data === 'string') {
+                json = JSON.parse(mapData.map_data);
+            } else {
+                json = mapData.map_data;
+            }
+            if(!json.customImages) json.customImages = [];
+            
+            setOriginalMap(json); 
+            setCurrentMap(JSON.parse(JSON.stringify(json)));
+        } else {
+            alert("Map data is empty");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Failed to load public map");
+    }
   };
 
   const handleRetry = () => {
