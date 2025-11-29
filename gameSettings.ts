@@ -8,7 +8,7 @@ export const GAME_SETTINGS = {
     // 1.0 = Normal Speed
     // 0.8 = 80% Speed (Slower)
     // 1.2 = 120% Speed (Faster)
-    timeScale: 1.0,
+    timeScale: 0.7,
 
     // Cap for delta time to prevent physics glitches during frame drops
     maxDelta: 2.0,
@@ -16,7 +16,7 @@ export const GAME_SETTINGS = {
     // --- Physics Parameters ---
     
     // Gravity: Pulls entities down (pixels/frame^2)
-    gravity: 0.5,
+    gravity: 0.4,
     
     // Terminal Velocity: Maximum falling speed (pixels/frame)
     terminalVelocity: 12,
@@ -24,10 +24,10 @@ export const GAME_SETTINGS = {
     // --- Player Movement ---
     
     // Run Speed: Max horizontal speed (pixels/frame)
-    runSpeed: 4,
+    runSpeed: 3,
     
     // Acceleration: How fast the player reaches max speed
-    acceleration: 0.5,
+    acceleration: 0.6,
     
     // Friction: How fast the player stops when no key is pressed (0.0 - 1.0)
     // Lower is slippery, Higher is sticky.
