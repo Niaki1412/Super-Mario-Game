@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, LogOut, LogIn, UserPlus, X, Mail, Hash, ChevronDown, ShieldCheck } from 'lucide-react';
+import { User, LogOut, LogIn, UserPlus, X, Mail, Hash, ChevronDown, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { loginUser, registerUser, logoutUser, getUserProfile, UserOut } from '../../api';
 
 export const UserBar: React.FC = () => {
@@ -26,8 +26,24 @@ export const UserBar: React.FC = () => {
     // Check local storage on mount
     const token = localStorage.getItem('access_token');
     const username = localStorage.getItem('username');
-    if (token && username) {
-      setUser({ username, token });
+    
+    if (token) {
+      if (username) {
+        setUser({ username, token });
+      }
+      
+      // Fetch latest profile data immediately
+      getUserProfile(token)
+        .then(data => {
+          setProfileData(data);
+          // Update username in case it changed on backend
+          setUser({ username: data.username, token });
+          localStorage.setItem('username', data.username);
+        })
+        .catch(err => {
+          console.error("Failed to fetch initial profile", err);
+          // Optional: handle token expiration here by logging out
+        });
     }
   }, []);
 
@@ -70,6 +86,15 @@ export const UserBar: React.FC = () => {
       localStorage.setItem('access_token', res.access_token);
       localStorage.setItem('username', formData.username);
       setUser({ username: formData.username, token: res.access_token });
+      
+      // Fetch profile after login to populate roles etc.
+      try {
+          const profile = await getUserProfile(res.access_token);
+          setProfileData(profile);
+      } catch (err) {
+          console.error("Failed to fetch profile after login");
+      }
+
       window.dispatchEvent(new Event('auth-change'));
       clearForms();
     } catch (err: any) {
@@ -105,6 +130,7 @@ export const UserBar: React.FC = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('username');
     setUser(null);
+    setProfileData(null);
     setShowProfilePopover(false);
     window.dispatchEvent(new Event('auth-change'));
   };
@@ -117,15 +143,35 @@ export const UserBar: React.FC = () => {
 
       if (!user?.token) return;
       
-      setIsLoading(true);
+      // If we don't have profile data yet, fetch it
+      if (!profileData) {
+          setIsLoading(true);
+          try {
+              const data = await getUserProfile(user.token);
+              setProfileData(data);
+          } catch (err) {
+              console.error("Failed to load profile", err);
+          } finally {
+              setIsLoading(false);
+          }
+      }
+      
       setShowProfilePopover(true); 
-      try {
-          const data = await getUserProfile(user.token);
-          setProfileData(data);
-      } catch (err) {
-          console.error("Failed to load profile", err);
-      } finally {
-          setIsLoading(false);
+  };
+
+  const getRoleLabel = (role: number) => {
+      switch (role) {
+          case 2: return "Super Admin";
+          case 1: return "Auditor";
+          default: return "User";
+      }
+  };
+
+  const getRoleColor = (role: number) => {
+      switch (role) {
+          case 2: return "text-purple-400 bg-purple-500/20 border-purple-500/30";
+          case 1: return "text-blue-400 bg-blue-500/20 border-blue-500/30";
+          default: return "text-gray-400 bg-gray-500/20 border-gray-500/30";
       }
   };
 
@@ -197,11 +243,13 @@ export const UserBar: React.FC = () => {
                                 <div className="flex items-center justify-between p-2 rounded hover:bg-white/5 transition-colors cursor-default">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-white/10 p-1.5 rounded-full text-gray-300">
-                                            <Hash size={14} />
+                                            <BadgeCheck size={14} />
                                         </div>
-                                        <span className="text-sm text-gray-300">User ID</span>
+                                        <span className="text-sm text-gray-300">Role</span>
                                     </div>
-                                    <span className="text-sm font-mono text-gray-400">#{profileData.id}</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full border ${getRoleColor(profileData.role)}`}>
+                                        {getRoleLabel(profileData.role)}
+                                    </span>
                                 </div>
                                 
                                 <div className="flex items-center justify-between p-2 rounded hover:bg-white/5 transition-colors cursor-default">
