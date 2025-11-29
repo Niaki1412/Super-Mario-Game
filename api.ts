@@ -235,14 +235,18 @@ export const restoreMap = async (data: RestoreIn, token: string): Promise<void> 
   if (!res.ok) throw new Error('Failed to restore map');
 };
 
-export const getPublicMaps = async (): Promise<PublicMapListItem[]> => {
-   const res = await fetch(`${API_BASE}/public_map_list`, {
+// dataScope: 0 = All, 1 = Current User
+export const getPublicMaps = async (dataScope: number = 0, token?: string | null): Promise<PublicMapListItem[]> => {
+   const res = await fetch(`${API_BASE}/public_map_list?data_scope=${dataScope}`, {
      method: 'GET',
-     headers: getHeaders()
+     headers: getHeaders(token)
    });
    if (!res.ok) throw new Error('Failed to fetch public maps');
    const json = await res.json();
-   return json; // The provided example shows direct array return [ { ... } ]
+   
+   // Handle both raw array (legacy) or { data: [...] } format
+   if (Array.isArray(json)) return json;
+   return json.data || [];
 };
 
 export const publishMap = async (data: PublishIn, token: string): Promise<void> => {
