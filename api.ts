@@ -22,7 +22,7 @@ export interface UserOut {
   id: number;
   username: string;
   mail: string;
-  role: number; // 0: User, 1: Auditor, 2: Admin
+  role: string; // "0": User, "1": Auditor, "2": Admin
 }
 
 // Map Interfaces

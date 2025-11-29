@@ -159,18 +159,18 @@ export const UserBar: React.FC = () => {
       setShowProfilePopover(true); 
   };
 
-  const getRoleLabel = (role: number) => {
+  const getRoleLabel = (role: string) => {
       switch (role) {
-          case 2: return "Super Admin";
-          case 1: return "Auditor";
+          case '2': return "Super Admin";
+          case '1': return "Auditor";
           default: return "User";
       }
   };
 
-  const getRoleColor = (role: number) => {
+  const getRoleColor = (role: string) => {
       switch (role) {
-          case 2: return "text-purple-400 bg-purple-500/20 border-purple-500/30";
-          case 1: return "text-blue-400 bg-blue-500/20 border-blue-500/30";
+          case '2': return "text-purple-400 bg-purple-500/20 border-purple-500/30";
+          case '1': return "text-blue-400 bg-blue-500/20 border-blue-500/30";
           default: return "text-gray-400 bg-gray-500/20 border-gray-500/30";
       }
   };
