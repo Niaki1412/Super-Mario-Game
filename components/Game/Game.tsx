@@ -301,7 +301,8 @@ export const Game: React.FC<GameProps> = ({
                 y: y,
                 w: tileSize,
                 h: h,
-                vx: config.category === 'enemy' ? -1 : 0, 
+                // Initialize velocity based on config speed
+                vx: config.category === 'enemy' ? -(config.attributes?.speed ?? 1) * scaleRatio : 0, 
                 vy: 0,
                 isDead: false,
                 grounded: false,

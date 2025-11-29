@@ -1,3 +1,4 @@
+
 import React from 'react';
 import * as PIXI from 'pixi.js';
 import { ElementConfig } from './types';
@@ -143,9 +144,12 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     color: 0xA0522D,
     attributes: { points: 100, gravity: true, speed: 1 },
     renderSVG: () => <SvgGoomba />,
-    renderPixi: (g, _l, x, y, w, h) => {
+    renderPixi: (g, _l, x, y, w, h, data) => {
+        // Simple wobble animation
+        const wobble = data ? Math.sin(Date.now() / 150) * 2 : 0;
+        
         g.moveTo(x + w*0.2, y + h*0.7)
-         .quadraticCurveTo(x + w*0.5, y - h*0.1, x + w*0.8, y + h*0.7)
+         .quadraticCurveTo(x + w*0.5, y - h*0.1 + wobble, x + w*0.8, y + h*0.7)
          .lineTo(x + w*0.9, y + h*0.9)
          .lineTo(x + w*0.1, y + h*0.9)
          .fill(0xA0522D);
@@ -167,23 +171,29 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     renderSVG: () => <SvgTurtle />,
     renderPixi: (g, _l, x, y, w, h, data) => {
         const isShell = data?.isShell;
+        const vx = data?.vx || 0;
+        const isFacingRight = vx > 0;
         
+        // Helper to flip X coordinate if facing right
+        const tx = (localX: number) => isFacingRight ? (x + w - localX) : (x + localX);
+
         if (isShell) {
              // Shell State
              g.ellipse(x + w/2, y + h*0.8, w*0.4, h*0.25).fill(0x006400); // Shell
              g.ellipse(x + w/2, y + h*0.8, w*0.3, h*0.15).stroke({ width: 2, color: 0xFFFFFF, alpha: 0.3 });
         } else {
             // Walking State
-            // Legs
+            // Legs (Symmetric enough)
             g.rect(x + w*0.2, y + h*0.75, w*0.15, h*0.25).fill(0x32CD32);
             g.rect(x + w*0.65, y + h*0.75, w*0.15, h*0.25).fill(0x32CD32);
             
-            // Head
-            g.circle(x + w*0.25, y + h*0.35, w*0.2).fill(0x32CD32);
+            // Head (Directional)
+            // Original: x + w*0.25 (Left side)
+            g.circle(tx(w*0.25), y + h*0.35, w*0.2).fill(0x32CD32);
             // Eye
-            g.circle(x + w*0.2, y + h*0.3, 2).fill(0x000000);
+            g.circle(tx(w*0.2), y + h*0.3, 2).fill(0x000000);
             
-            // Shell Body
+            // Shell Body (Centered)
             g.ellipse(x + w*0.55, y + h*0.6, w*0.35, h*0.25).fill(0x006400);
             g.ellipse(x + w*0.55, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
         }
