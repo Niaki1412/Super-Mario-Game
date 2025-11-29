@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as PIXI from 'pixi.js';
@@ -8,7 +7,7 @@ import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
 import { getMyMaps, getMapById, MapListItem } from '../../api';
-import { Cloud } from 'lucide-react';
+import { Cloud, LogOut, RotateCcw } from 'lucide-react';
 
 const DEFAULT_CONTROLS = {
     left: 'a',
@@ -43,7 +42,7 @@ export const Game: React.FC<GameProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   
-  const mapRef = useRef<GameMap | null>(initialMapData || null);
+  const mapRef = useRef<GameMap | null>(null);
   const entitiesRef = useRef<ExtendedEntity[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const keysRef = useRef<Record<string, boolean>>({});
@@ -57,10 +56,17 @@ export const Game: React.FC<GameProps> = ({
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [gameWon, setGameWon] = useState(false);
-  const [currentMap, setCurrentMap] = useState<GameMap | null>(initialMapData || null);
+  
+  // originalMap stores the clean, initial state of the level for resetting
+  const [originalMap, setOriginalMap] = useState<GameMap | null>(() => {
+      return initialMapData ? JSON.parse(JSON.stringify(initialMapData)) : null;
+  });
+  // currentMap is the active state being played/modified
+  const [currentMap, setCurrentMap] = useState<GameMap | null>(() => {
+      return initialMapData ? JSON.parse(JSON.stringify(initialMapData)) : null;
+  });
   
   const [controls, setControls] = useState(DEFAULT_CONTROLS);
-  const [bindingAction, setBindingAction] = useState<keyof typeof DEFAULT_CONTROLS | null>(null);
 
   const [myMaps, setMyMaps] = useState<MapListItem[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(false);
@@ -125,8 +131,6 @@ export const Game: React.FC<GameProps> = ({
           const token = localStorage.getItem('access_token');
           if (token) {
               setIsLoadingMaps(true);
-              // Pass status=1 to fetch only normal/active maps
-              // Pass page=1, pageSize=-1 to get ALL active maps for the dropdown list
               getMyMaps(token, 1, 1, -1)
                 .then((data) => setMyMaps(data.list))
                 .catch(err => console.error("Failed to load maps", err))
@@ -435,28 +439,56 @@ export const Game: React.FC<GameProps> = ({
 
       if (axis === 'x') {
           if (entity.vx > 0) { // Right
-              if (right >= map.width) { entity.x = map.width * tileSize - entity.w; entity.vx = 0; return; }
+              // Map Boundary Check
+              if (right >= map.width) { 
+                  entity.x = map.width * tileSize - entity.w; 
+                  if (entity.isEnemy) entity.vx = -entity.vx; // Bounce
+                  else entity.vx = 0; 
+                  return; 
+              }
               for (let y = top; y <= bottom; y++) {
                    if (y < 0 || y >= map.height) continue;
                    const tileId = map.tiles[y][right];
                    if (isSolid(tileId)) {
                        entity.x = right * tileSize - entity.w;
-                       entity.vx = 0;
-                       if (entity.isEnemy) entity.vx *= -1;
-                       else if (entity.isBullet) { entity.isDead = true; spawnParticles(entity.x + entity.w, entity.y, 0xFFD700); }
+                       // FIX: Enemy bounces, others stop
+                       if (entity.isEnemy) {
+                           entity.vx = -Math.abs(entity.vx);
+                       } else {
+                           entity.vx = 0;
+                       }
+                       
+                       if (!entity.isEnemy && entity.isBullet) { 
+                           entity.isDead = true; 
+                           spawnParticles(entity.x + entity.w, entity.y, 0xFFD700); 
+                       }
                        return;
                    }
               }
           } else if (entity.vx < 0) { // Left
-              if (left < 0) { entity.x = 0; entity.vx = 0; return; }
+              // Map Boundary Check
+              if (left < 0) { 
+                  entity.x = 0; 
+                  if (entity.isEnemy) entity.vx = -entity.vx; // Bounce
+                  else entity.vx = 0; 
+                  return; 
+              }
               for (let y = top; y <= bottom; y++) {
                   if (y < 0 || y >= map.height) continue;
                   const tileId = map.tiles[y][left];
                   if (isSolid(tileId)) {
                       entity.x = (left + 1) * tileSize;
-                      entity.vx = 0;
-                      if (entity.isEnemy) entity.vx *= -1;
-                      else if (entity.isBullet) { entity.isDead = true; spawnParticles(entity.x, entity.y, 0xFFD700); }
+                      // FIX: Enemy bounces, others stop
+                      if (entity.isEnemy) {
+                          entity.vx = Math.abs(entity.vx);
+                      } else {
+                          entity.vx = 0;
+                      }
+
+                      if (!entity.isEnemy && entity.isBullet) { 
+                          entity.isDead = true; 
+                          spawnParticles(entity.x, entity.y, 0xFFD700); 
+                      }
                       return;
                   }
               }
@@ -477,9 +509,8 @@ export const Game: React.FC<GameProps> = ({
                       
                       if (isLethalTile(tileId)) {
                           if (entity.isPlayer) takeDamage(entity);
-                          else if (!entity.isBullet) entity.isDead = true; // Bullets die on walls, not floors usually?
+                          else if (!entity.isBullet) entity.isDead = true; 
                           if (entity.isBullet) { 
-                             // Bananas bounce or die? Let's make them die for simplicity or bounce once
                              entity.isDead = true; 
                              spawnParticles(entity.x, entity.y + entity.h, 0xFFD700);
                           }
@@ -1070,7 +1101,8 @@ export const Game: React.FC<GameProps> = ({
     reader.onload = (ev) => {
         try {
             const json = JSON.parse(ev.target?.result as string);
-            setCurrentMap(json);
+            setOriginalMap(json);
+            setCurrentMap(JSON.parse(JSON.stringify(json)));
         } catch { alert('Invalid Map'); }
     };
     reader.readAsText(file);
@@ -1093,13 +1125,22 @@ export const Game: React.FC<GameProps> = ({
               }
               // Ensure arrays
               if(!json.customImages) json.customImages = [];
-              setCurrentMap(json);
+              
+              setOriginalMap(json); // Save clean copy
+              setCurrentMap(JSON.parse(JSON.stringify(json))); // Deep copy for play
           } else {
               alert("Map data is empty");
           }
       } catch (e) {
           console.error(e);
           alert("Failed to load map from cloud");
+      }
+  };
+
+  const handleRetry = () => {
+      if (originalMap) {
+          // Deep clone to reset destroyed blocks etc.
+          setCurrentMap(JSON.parse(JSON.stringify(originalMap)));
       }
   };
 
@@ -1161,26 +1202,59 @@ export const Game: React.FC<GameProps> = ({
         </div>
         {!embedded && (
             <div className="absolute top-10 left-4 text-white font-mono text-xs opacity-70 drop-shadow-md z-10 select-none">
-                CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} Move, {getKeyDisplay(controls.down)} Crouch, {getKeyDisplay(controls.jump)} Jump, {getKeyDisplay(controls.doubleJump)} Double Jump, ESC to Exit
+                CONTROLS: {getKeyDisplay(controls.left)}/{getKeyDisplay(controls.right)} Move, {getKeyDisplay(controls.down)} Crouch, {getKeyDisplay(controls.jump)} Jump, {getKeyDisplay(controls.doubleJump)} Double Jump
             </div>
         )}
-        <button onClick={handleExit} className="absolute top-4 right-4 bg-gray-800/50 hover:bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 z-10 backdrop-blur-sm">EXIT GAME</button>
+        
+        {/* Exit Button */}
+        <button 
+            onClick={handleExit} 
+            className="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-full font-bold shadow-lg z-10 backdrop-blur-sm border border-red-500 flex items-center gap-2 transition-all hover:scale-105"
+        >
+            <LogOut size={16} />
+            EXIT GAME
+        </button>
+
         {gameOver && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 animate-fade-in backdrop-blur-sm">
                 <h1 className="text-6xl text-red-500 font-black mb-4 animate-bounce">GAME OVER</h1>
-                <p className="text-white text-xl mb-8">Score: {score}</p>
+                <p className="text-white text-xl mb-8 font-mono">Final Score: {score}</p>
                 <div className="flex gap-4">
-                    <button onClick={() => setCurrentMap({...currentMap})} className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded shadow-lg">Try Again</button>
-                    <button onClick={handleExit} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded shadow-lg">Quit</button>
+                    <button 
+                        onClick={handleRetry} 
+                        className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-2 transform hover:scale-105 transition-all"
+                    >
+                        <RotateCcw size={20} />
+                        Play Again
+                    </button>
+                    <button 
+                        onClick={handleExit} 
+                        className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-full shadow-lg flex items-center gap-2 transform hover:scale-105 transition-all"
+                    >
+                        <LogOut size={20} />
+                        Quit
+                    </button>
                 </div>
             </div>
         )}
         {gameWon && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-500/80 z-20 backdrop-blur-sm">
-                <h1 className="text-6xl text-yellow-300 font-black mb-4 animate-bounce drop-shadow-md border-stroke">LEVEL CLEARED!</h1>
-                <p className="text-white text-2xl font-bold mb-8 drop-shadow">Score: {score}</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-600/90 z-20 backdrop-blur-md animate-fade-in">
+                <h1 className="text-6xl text-yellow-300 font-black mb-4 animate-bounce drop-shadow-lg stroke-black">LEVEL CLEARED!</h1>
+                <p className="text-white text-3xl font-bold mb-8 drop-shadow-md">Score: {score}</p>
                 <div className="flex gap-4">
-                    <button onClick={handleExit} className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all">Return to Menu</button>
+                    <button 
+                        onClick={handleRetry} 
+                        className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all flex items-center gap-2"
+                    >
+                        <RotateCcw size={20} />
+                        Replay
+                    </button>
+                    <button 
+                        onClick={handleExit} 
+                        className="bg-white hover:bg-gray-100 text-blue-600 font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all"
+                    >
+                        Return to Menu
+                    </button>
                 </div>
             </div>
         )}
