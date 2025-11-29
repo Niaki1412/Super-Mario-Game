@@ -5,6 +5,7 @@ import { GameMap, Entity, Particle, Rect } from '../../types';
 import { getElementByName, getElementById, GAME_ELEMENTS_REGISTRY } from '../../elementRegistry';
 import { PLAYER_CONFIG } from '../../playerConfig';
 import { audioManager } from '../../audioManager';
+import { GAME_SETTINGS } from '../../gameSettings';
 
 interface ExtendedEntity extends Entity {
     bulletVariant?: 'fireball' | 'banana';
@@ -230,7 +231,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             // Game Loop
             app.ticker.add((ticker) => {
                 if (isGameOverRef.current || isWonRef.current || !mapRef.current) return;
-                const delta = Math.min(ticker.deltaTime, 2.0);
+                
+                // Apply Time Scale from Settings
+                const rawDelta = ticker.deltaTime;
+                const safeDelta = Math.min(rawDelta, GAME_SETTINGS.maxDelta);
+                const delta = safeDelta * GAME_SETTINGS.timeScale;
+                
                 updatePhysics(delta);
                 render(app);
             });
@@ -301,7 +307,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (entity.isBig) {
             entity.isBig = false;
             entity.canShoot = false;
-            entity.invincibleTimer = 120;
+            entity.invincibleTimer = GAME_SETTINGS.damageInvincibility;
             const scaleRatio = mapRef.current.tileSize / 32;
             const newH = PLAYER_CONFIG.small.height * scaleRatio;
             entity.y += (entity.h - newH);
@@ -556,7 +562,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 if (keys[controls.shoot]) {
                     if (entity.canShoot && (!entity.shootCooldown || entity.shootCooldown <= 0)) {
                         spawnBullet(entity);
-                        entity.shootCooldown = 20; 
+                        entity.shootCooldown = GAME_SETTINGS.shootCooldown; 
                     }
                 }
                 if (entity.shootCooldown && entity.shootCooldown > 0) {

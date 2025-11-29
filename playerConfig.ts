@@ -1,16 +1,17 @@
 
 import { TILE_SIZE } from './constants';
+import { GAME_SETTINGS } from './gameSettings';
 
 export const PLAYER_CONFIG = {
-    // Base Physics
+    // Base Physics linked to Global Settings
     physics: {
-        runSpeed: 4,
-        acceleration: 0.5,
-        friction: 0.8,
-        gravity: 0.5,
-        terminalVelocity: 12,
-        bounceForce: -5, // When jumping on enemies
-        bulletSpeed: 8,
+        runSpeed: GAME_SETTINGS.runSpeed,
+        acceleration: GAME_SETTINGS.acceleration,
+        friction: GAME_SETTINGS.friction,
+        gravity: GAME_SETTINGS.gravity,
+        terminalVelocity: GAME_SETTINGS.terminalVelocity,
+        bounceForce: GAME_SETTINGS.bounceForce,
+        bulletSpeed: GAME_SETTINGS.bulletSpeed,
     },
 
     // Projectile Settings
