@@ -1,14 +1,14 @@
-
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem, getPublicMaps, PublicMapListItem } from '../../api';
 import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, EyeOff, Activity, Ban, RotateCcw, ChevronLeft, ChevronRight, FileEdit, LayoutGrid, Gamepad2, ImageOff, Calendar } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  // Tab State
-  const [activeTab, setActiveTab] = useState<'drafts' | 'published'>('drafts');
+  // Tab State derived from URL to persist across refreshes
+  const activeTab = searchParams.get('tab') === 'published' ? 'published' : 'drafts';
 
   // Drafts Data
   const [maps, setMaps] = useState<MapListItem[]>([]);
@@ -235,7 +235,7 @@ export const MyMaps: React.FC = () => {
           <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
               <div className="p-4 space-y-2">
                   <button 
-                    onClick={() => setActiveTab('drafts')}
+                    onClick={() => setSearchParams({ tab: 'drafts' })}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${
                         activeTab === 'drafts' 
                         ? 'bg-blue-600 text-white shadow-lg' 
@@ -246,7 +246,7 @@ export const MyMaps: React.FC = () => {
                       My Drafts
                   </button>
                   <button 
-                    onClick={() => setActiveTab('published')}
+                    onClick={() => setSearchParams({ tab: 'published' })}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${
                         activeTab === 'published' 
                         ? 'bg-purple-600 text-white shadow-lg' 
