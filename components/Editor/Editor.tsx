@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AssetPalette } from './AssetPalette';
@@ -103,12 +101,23 @@ export const Editor: React.FC = () => {
             if (token) {
                 try {
                     const cloudMap = await getMapById(Number(mapIdParam), token);
-                    if (cloudMap && cloudMap.map_data) {
-                         const json = typeof cloudMap.map_data === 'string' ? JSON.parse(cloudMap.map_data) : cloudMap.map_data;
-                         // Ensure customImages is array
-                         if (!json.customImages) json.customImages = [];
-                         setMapData(json);
-                         if (cloudMap.title) setMapName(cloudMap.title);
+                    if (cloudMap) {
+                         // Set title independently of map data
+                         if (cloudMap.title) {
+                             setMapName(cloudMap.title);
+                         }
+
+                         if (cloudMap.map_data) {
+                             try {
+                                 const json = typeof cloudMap.map_data === 'string' ? JSON.parse(cloudMap.map_data) : cloudMap.map_data;
+                                 // Ensure customImages is array
+                                 if (!json.customImages) json.customImages = [];
+                                 setMapData(json);
+                             } catch (err) {
+                                 console.error("Error parsing map data", err);
+                             }
+                         }
+                         
                          setLastSaved(new Date());
                          showToast(`Map #${mapIdParam} loaded from cloud`, 'info');
                          return; 
