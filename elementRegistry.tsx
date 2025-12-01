@@ -1,3 +1,4 @@
+
 import React from 'react';
 import * as PIXI from 'pixi.js';
 import { ElementConfig } from './types';
@@ -5,7 +6,8 @@ import {
     SvgGround, SvgBrick, SvgHardBlock, SvgQuestionBlock, SvgInvisibleDeathBlock, SvgEmptyBlock,
     SvgGoomba, SvgTurtle, SvgPiranhaPlant, SvgPopUpSpike, SvgRotatingSpike,
     SvgCoin, SvgMushroom, SvgFireMushroom, SvgCloud, SvgBullet, SvgPlayerStart, SvgFlagpole, SvgTextDecoration,
-    SvgMario, SvgFlyingTurtle, SvgHopper, SvgFireDino, SvgBomb
+    SvgMario, SvgFlyingTurtle, SvgHopper, SvgFireDino, SvgBomb,
+    SvgGrass, SvgSnow, SvgWater, SvgLava, SvgSpring, SvgBoostPad, SvgLightning, SvgPipe
 } from './elementSVGs';
 
 export interface RegistryItem extends ElementConfig {
@@ -29,6 +31,85 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
         g.moveTo(x + 4, y + 10).lineTo(x + 8, y + 6).lineTo(x + 12, y + 10).stroke({ width: 1.5, color: 0x000000, alpha: 0.2 });
         g.moveTo(x + 20, y + 20).lineTo(x + 24, y + 16).lineTo(x + 28, y + 20).stroke({ width: 1.5, color: 0x000000, alpha: 0.2 });
     }
+  },
+  {
+      id: 7,
+      type: 'tile',
+      name: 'Grass',
+      category: 'terrain',
+      color: 0x4CAF50,
+      attributes: { solid: true },
+      renderSVG: () => <SvgGrass />,
+      renderPixi: (g, _l, x, y, w, h) => {
+          g.rect(x, y, w, h).fill(0x5D4037);
+          g.rect(x, y, w, h*0.3).fill(0x4CAF50);
+          // Jagged bottom of grass
+          g.moveTo(x, y + h*0.3).lineTo(x + w*0.12, y + h*0.42).lineTo(x + w*0.25, y + h*0.3)
+           .lineTo(x + w*0.37, y + h*0.42).lineTo(x + w*0.5, y + h*0.3)
+           .lineTo(x + w*0.62, y + h*0.42).lineTo(x + w*0.75, y + h*0.3)
+           .lineTo(x + w*0.87, y + h*0.42).lineTo(x + w, y + h*0.3)
+           .lineTo(x+w, y).lineTo(x, y).fill(0x4CAF50);
+           
+           // Highlight
+           g.moveTo(x + w*0.2, y + h*0.15).lineTo(x + w*0.25, y + h*0.05).stroke({width: 1.5, color: 0x81C784});
+           g.moveTo(x + w*0.75, y + h*0.18).lineTo(x + w*0.8, y + h*0.08).stroke({width: 1.5, color: 0x81C784});
+      }
+  },
+  {
+      id: 8,
+      type: 'tile',
+      name: 'Snow',
+      category: 'terrain',
+      color: 0x90CAF9,
+      attributes: { solid: true, friction: 0.05 }, // Very slippery
+      renderSVG: () => <SvgSnow />,
+      renderPixi: (g, _l, x, y, w, h) => {
+          g.rect(x, y, w, h).fill(0x90CAF9); // Ice blue bottom
+          g.rect(x, y, w, h*0.4).fill(0xFFFFFF); // Snow top
+          g.moveTo(x, y + h*0.4).quadraticCurveTo(x + w*0.25, y + h*0.55, x + w*0.5, y + h*0.4)
+           .quadraticCurveTo(x + w*0.75, y + h*0.55, x + w, y + h*0.4).lineTo(x+w, y).lineTo(x, y).fill(0xFFFFFF);
+          
+          g.circle(x + w*0.2, y + h*0.7, 2).fill({color: 0xFFFFFF, alpha: 0.6});
+          g.circle(x + w*0.8, y + h*0.8, 3).fill({color: 0xFFFFFF, alpha: 0.6});
+      }
+  },
+  {
+      id: 9,
+      type: 'tile',
+      name: 'Water',
+      category: 'terrain',
+      color: 0x2196F3,
+      attributes: { solid: false, liquidType: 'water', friction: 0.8 },
+      renderSVG: () => <SvgWater />,
+      renderPixi: (g, _l, x, y, w, h) => {
+          g.rect(x, y, w, h).fill({color: 0x2196F3, alpha: 0.5});
+          // Wave lines
+          const t = Date.now() / 500;
+          const offset = Math.sin(t + x) * 2;
+          g.moveTo(x, y + h*0.2 + offset).quadraticCurveTo(x + w/2, y + h*0.1 + offset, x + w, y + h*0.2 + offset).stroke({width: 1, color: 0xBBDEFB, alpha: 0.8});
+          
+          // Bubbles
+          g.circle(x + w*0.3, y + h*0.5, 2).fill({color: 0xFFFFFF, alpha: 0.3});
+          g.circle(x + w*0.7, y + h*0.8, 3).fill({color: 0xFFFFFF, alpha: 0.3});
+      }
+  },
+  {
+      id: 10,
+      type: 'tile',
+      name: 'Lava',
+      category: 'terrain',
+      color: 0xD32F2F,
+      attributes: { solid: false, liquidType: 'lava', lethal: true },
+      renderSVG: () => <SvgLava />,
+      renderPixi: (g, _l, x, y, w, h) => {
+          const t = Date.now() / 200;
+          const colorShift = Math.sin(t) > 0 ? 0xD32F2F : 0xC62828;
+          g.rect(x, y, w, h).fill(colorShift);
+          
+          g.circle(x + w*0.25, y + h*0.5, w*0.1).fill(0xFFC107);
+          g.circle(x + w*0.75, y + h*0.8, w*0.15).fill(0xFF9800);
+          g.circle(x + w*0.5, y + h*0.2, w*0.08).fill(0xFFEB3B);
+      }
   },
   {
     id: 2,
@@ -135,6 +216,86 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
   },
 
   // --- OBJECTS ---
+  {
+      id: 120,
+      type: 'object',
+      name: 'Spring',
+      category: 'trigger',
+      color: 0xD32F2F,
+      attributes: { gravity: true, solid: true, bounceForce: -18 },
+      renderSVG: () => <SvgSpring />,
+      renderPixi: (g, _l, x, y, w, h, data) => {
+          // Base
+          g.rect(x + 4, y + h*0.8, w - 8, h*0.2).fill(0x333333);
+          // Red top
+          g.rect(x + 2, y + h*0.2, w - 4, h*0.15).fill(0xD32F2F);
+          // Zigzag spring
+          g.moveTo(x + 8, y + h*0.8)
+           .lineTo(x + w - 8, y + h*0.8)
+           .lineTo(x + w - 12, y + h*0.5)
+           .lineTo(x + w - 4, y + h*0.35)
+           .lineTo(x + 4, y + h*0.35)
+           .lineTo(x + 10, y + h*0.5)
+           .lineTo(x + 8, y + h*0.8)
+           .fill(0xBBBBBB).stroke({width: 1, color: 0x555555});
+      }
+  },
+  {
+      id: 121,
+      type: 'object',
+      name: 'Boost Pad',
+      category: 'trigger',
+      color: 0x00E676,
+      attributes: { gravity: false, solid: false, boostSpeed: 20 },
+      renderSVG: () => <SvgBoostPad />,
+      renderPixi: (g, _l, x, y, w, h) => {
+          g.rect(x, y + h*0.8, w, h*0.2).fill(0x333333);
+          // Green arrows
+          g.moveTo(x + w*0.1, y + h*0.8).lineTo(x + w*0.4, y + h*0.8).lineTo(x + w*0.6, y + h*0.5).lineTo(x + w*0.4, y + h*0.5).fill(0x00E676);
+          g.moveTo(x + w*0.5, y + h*0.8).lineTo(x + w*0.8, y + h*0.8).lineTo(x + w, y + h*0.5).lineTo(x + w*0.8, y + h*0.5).fill(0x00E676);
+          // Glow
+          const t = Date.now() / 100;
+          const alpha = (Math.sin(t) + 1) / 2 * 0.5 + 0.2;
+          g.moveTo(x + w*0.1, y + h*0.8).lineTo(x + w*0.6, y + h*0.5).stroke({width: 2, color: 0xFFFFFF, alpha});
+      }
+  },
+  {
+      id: 122,
+      type: 'object',
+      name: 'Lightning Trap',
+      category: 'enemy',
+      color: 0xFFEB3B,
+      attributes: { gravity: false, solid: false, lethal: true },
+      renderSVG: () => <SvgLightning />,
+      renderPixi: (g, _l, x, y, w, h) => {
+          g.circle(x + w/2, y + h/2, w/2).fill(0x212121);
+          // Bolt
+          const t = Date.now() / 50;
+          if (Math.floor(t) % 10 < 5) {
+              g.moveTo(x + w*0.6, y + h*0.1).lineTo(x + w*0.3, y + h*0.5).lineTo(x + w*0.5, y + h*0.5)
+               .lineTo(x + w*0.4, y + h*0.9).lineTo(x + w*0.7, y + h*0.4).lineTo(x + w*0.5, y + h*0.4)
+               .lineTo(x + w*0.6, y + h*0.1).fill(0xFFEB3B).stroke({width: 1, color: 0xF57F17});
+          }
+      }
+  },
+  {
+      id: 123,
+      type: 'object',
+      name: 'Pipe',
+      category: 'terrain',
+      color: 0x4CAF50,
+      attributes: { gravity: false, solid: true },
+      renderSVG: () => <SvgPipe />,
+      renderPixi: (g, _l, x, y, w, h) => {
+          // Rim
+          g.rect(x, y, w, h*0.3).fill(0x4CAF50).stroke({width: 2, color: 0x1B5E20});
+          // Body
+          g.rect(x + 2, y + h*0.3, w - 4, h*0.7).fill(0x43A047).stroke({width: 2, color: 0x1B5E20});
+          // Highlights
+          g.rect(x + 8, y + 2, 2, h*0.2).fill({color: 0xFFFFFF, alpha: 0.3});
+          g.rect(x + 10, y + h*0.3, 4, h*0.7).fill({color: 0x000000, alpha: 0.1});
+      }
+  },
   {
     id: 101,
     type: 'object',

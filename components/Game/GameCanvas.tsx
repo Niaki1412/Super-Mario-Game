@@ -395,6 +395,34 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const top = Math.floor(entity.y / tileSize);
         const bottom = Math.floor((entity.y + entity.h - 0.01) / tileSize);
 
+        // Reset Physics modifiers
+        if (axis === 'y') {
+            entity.isInWater = false;
+            entity.frictionMultiplier = 1;
+        }
+
+        // Overlap Check for Liquid/Gas (Non-solid tiles)
+        for (let y = top; y <= bottom; y++) {
+            for (let x = left; x <= right; x++) {
+                if (y < 0 || y >= map.height || x < 0 || x >= map.width) continue;
+                const tileId = map.tiles[y][x];
+                const el = getElementById(tileId);
+                
+                if (el?.attributes?.liquidType === 'water') {
+                    entity.isInWater = true;
+                } else if (el?.attributes?.liquidType === 'lava') {
+                    if (entity.isPlayer) takeDamage(entity);
+                    else if (!entity.isBullet && !entity.hasGravity) { /* Flying things safe */ }
+                    else { entity.isDead = true; }
+                }
+
+                // Ice check (if standing on it)
+                if (axis === 'y' && y === bottom && el?.attributes?.friction !== undefined) {
+                    entity.frictionMultiplier = el.attributes.friction;
+                }
+            }
+        }
+
         if (axis === 'x') {
             if (entity.vx > 0) {
                 if (right >= map.width) { 
@@ -435,7 +463,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             }
         } else { // Y
             if (entity.vy > 0) {
-                if (bottom >= map.height) return;
+                if (bottom >= map.height) {
+                    // Fall off map
+                    return;
+                }
                 for (let x = left; x <= right; x++) {
                     if (x < 0 || x >= map.width) continue;
                     const tileId = map.tiles[bottom][x];
@@ -518,9 +549,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             if (entity.isDead && !entity.isPlayer) return;
             if (entity.type === 'CustomImage') return;
 
+            // -- Gravity & Water Physics --
             if (entity.hasGravity) {
-              entity.vy += phys.gravity * scaleRatio * delta;
-              if (entity.vy > phys.terminalVelocity * scaleRatio) entity.vy = phys.terminalVelocity * scaleRatio;
+                let effectiveGravity = phys.gravity * scaleRatio;
+                let effectiveTerminal = phys.terminalVelocity * scaleRatio;
+                
+                if (entity.isInWater) {
+                    effectiveGravity *= 0.3; // Low gravity
+                    effectiveTerminal *= 0.3; // Slower falling
+                    // Apply drag
+                    entity.vy *= 0.95;
+                    entity.vx *= 0.95;
+                }
+
+                entity.vy += effectiveGravity * delta;
+                if (entity.vy > effectiveTerminal) entity.vy = effectiveTerminal;
             }
 
             if (entity.isBullet) {
@@ -564,12 +607,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             }
 
             if (entity.isPlayer && !entity.isDead) {
+                // Apply friction multiplier (Ice)
+                const effectiveFriction = entity.grounded && entity.frictionMultiplier 
+                    ? phys.friction * entity.frictionMultiplier 
+                    : phys.friction;
+
+                const effectiveAccel = entity.grounded && entity.frictionMultiplier && entity.frictionMultiplier < 1
+                    ? phys.acceleration * 0.2 // Harder to accelerate on ice
+                    : phys.acceleration;
+
                 if (keys[controls.left]) {
-                    entity.vx -= phys.acceleration * scaleRatio * delta;
+                    entity.vx -= effectiveAccel * scaleRatio * delta;
                 } else if (keys[controls.right]) {
-                    entity.vx += phys.acceleration * scaleRatio * delta;
+                    entity.vx += effectiveAccel * scaleRatio * delta;
                 } else {
-                    entity.vx *= phys.friction;
+                    entity.vx *= effectiveFriction;
                 }
 
                 if (entity.grounded && keys[controls.down]) {
@@ -596,22 +648,32 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 const doubleJumpJustPressed = keys[controls.doubleJump] && !prevKeys[controls.doubleJump];
                 const jumpRequested = jumpJustPressed || doubleJumpJustPressed;
 
-                if (entity.grounded) {
-                    entity.jumpCount = 0; 
+                // Jump / Swim Logic
+                if (entity.isInWater) {
+                    entity.grounded = false; // Always swimming
                     if (jumpRequested) {
-                        const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
-                        entity.vy = force * scaleRatio;
-                        entity.grounded = false;
-                        entity.jumpCount = 1;
-                        audioManager.playJump();
+                        entity.vy = -5 * scaleRatio; // Swim stroke
+                        audioManager.playJump(); // Splash sound ideally
+                        spawnParticles(entity.x, entity.y + entity.h, 0xFFFFFF);
                     }
                 } else {
-                    if (jumpRequested && (entity.jumpCount || 0) < 2) {
-                        const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
-                        entity.vy = force * 0.9 * scaleRatio; 
-                        entity.jumpCount = (entity.jumpCount || 0) + 1;
-                        audioManager.playJump();
-                        spawnParticles(entity.x, entity.y + entity.h, 0xFFFFFF); 
+                    if (entity.grounded) {
+                        entity.jumpCount = 0; 
+                        if (jumpRequested) {
+                            const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
+                            entity.vy = force * scaleRatio;
+                            entity.grounded = false;
+                            entity.jumpCount = 1;
+                            audioManager.playJump();
+                        }
+                    } else {
+                        if (jumpRequested && (entity.jumpCount || 0) < 2) {
+                            const force = entity.isBig ? PLAYER_CONFIG.big.jumpForce : PLAYER_CONFIG.small.jumpForce;
+                            entity.vy = force * 0.9 * scaleRatio; 
+                            entity.jumpCount = (entity.jumpCount || 0) + 1;
+                            audioManager.playJump();
+                            spawnParticles(entity.x, entity.y + entity.h, 0xFFFFFF); 
+                        }
                     }
                 }
                 
@@ -630,8 +692,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 }
 
                 const maxSpeed = phys.runSpeed * scaleRatio;
-                if (entity.vx > maxSpeed) entity.vx = maxSpeed;
-                if (entity.vx < -maxSpeed) entity.vx = -maxSpeed;
+                // Don't cap speed if being boosted
+                if (Math.abs(entity.vx) > maxSpeed * 3) {
+                     // Decelerate faster if super fast
+                     entity.vx *= 0.95;
+                } else if (Math.abs(entity.vx) > maxSpeed && !keys[controls.left] && !keys[controls.right]) {
+                    // Natural decay
+                } else {
+                    if (entity.vx > maxSpeed) entity.vx = maxSpeed;
+                    if (entity.vx < -maxSpeed) entity.vx = -maxSpeed;
+                }
 
                 if (entity.y > map.height * tileSize) {
                     die();
@@ -700,6 +770,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                      } else if (entity.spikeState === 'active') { if (entity.spikeTimer > 60) { entity.spikeState = 'hidden'; entity.spikeTimer = 0; } }
                  } else if (entity.type === 'Rotating Spike') {
                      entity.vx = 0; entity.vy = 0; entity.rotationAngle = (entity.rotationAngle || 0) + 0.05 * delta;
+                 } else if (entity.type === 'Lightning Trap') {
+                     entity.vx = 0; entity.vy = 0;
+                     // Constant hazard
                  } else if (entity.isShell && Math.abs(entity.vx) > 2) {
                      entitiesRef.current.forEach(other => {
                          if (other === entity || other.isDead || other.isPlayer || other.isEffect || other.isBullet) return;
@@ -727,6 +800,26 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     if (checkRectCollision(entity, other)) {
                         const config = getElementByName(other.type);
                         if (config?.attributes?.win) { winLevel(); return; }
+                        
+                        // New Objects Logic
+                        if (other.type === 'Spring') {
+                            // Only bounce if falling onto it
+                            if (entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.5) {
+                                entity.vy = (config?.attributes?.bounceForce || -15) * scaleRatio;
+                                entity.grounded = false;
+                                entity.jumpCount = 1;
+                                audioManager.playJump();
+                                return;
+                            }
+                        }
+
+                        if (other.type === 'Boost Pad') {
+                            const boost = config?.attributes?.boostSpeed || 10;
+                            entity.vx = boost * lastDirRef.current * scaleRatio;
+                            audioManager.playCoin(); // Sound effect
+                            spawnParticles(entity.x, entity.y + entity.h, 0x00E676);
+                            return;
+                        }
                         
                         if (config?.attributes?.solid) {
                            const dx = (entity.x + entity.w/2) - (other.x + other.w/2);
@@ -769,6 +862,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                             }
                             if (other.type === 'Pop-up Spike') {
                                 if (other.spikeState === 'active') takeDamage(entity);
+                                return;
+                            }
+                            if (other.type === 'Lightning Trap') {
+                                takeDamage(entity);
                                 return;
                             }
                             if (other.type === 'Rotating Spike') return;

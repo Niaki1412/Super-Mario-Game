@@ -34,6 +34,11 @@ export interface ElementConfig {
     gravity?: boolean;
     speed?: number;
     win?: boolean;
+    // New Attributes
+    friction?: number; // 0.0 to 1.0 (Lower is slippery)
+    liquidType?: 'water' | 'lava';
+    bounceForce?: number; // For springs
+    boostSpeed?: number; // For speed pads
   };
 }
 
@@ -116,6 +121,8 @@ export interface Entity extends Rect {
 
   // Physics specific
   hasGravity?: boolean;
+  isInWater?: boolean; // Physics state for water
+  frictionMultiplier?: number; // Physics state for ice
 
   // Decoration specific
   text?: string;
@@ -124,6 +131,9 @@ export interface Entity extends Rect {
   customImageId?: string;
   opacity?: number;
   scale?: number;
+  
+  // Bullet variant
+  bulletVariant?: 'fireball' | 'banana';
 }
 
 export interface Particle {

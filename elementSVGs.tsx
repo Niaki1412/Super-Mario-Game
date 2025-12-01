@@ -9,6 +9,81 @@ export const SvgGround = () => (
     </>
 );
 
+export const SvgGrass = () => (
+    <>
+        <rect x="0" y="0" width="32" height="32" fill="#5D4037" />
+        <rect x="0" y="0" width="32" height="10" fill="#4CAF50" />
+        <path d="M0 10 L4 14 L8 10 L12 14 L16 10 L20 14 L24 10 L28 14 L32 10 V0 H0 Z" fill="#4CAF50" />
+        <path d="M6 4 L8 2 M14 6 L12 3 M24 5 L26 2" stroke="#81C784" strokeWidth="1.5" />
+    </>
+);
+
+export const SvgSnow = () => (
+    <>
+        <rect x="0" y="0" width="32" height="32" fill="#90CAF9" />
+        <rect x="0" y="0" width="32" height="12" fill="#FFFFFF" />
+        <path d="M0 12 Q8 16 16 12 Q24 8 32 12 V0 H0 Z" fill="#FFFFFF" />
+        <circle cx="6" cy="24" r="2" fill="white" opacity="0.6" />
+        <circle cx="20" cy="20" r="3" fill="white" opacity="0.6" />
+        <circle cx="28" cy="28" r="1.5" fill="white" opacity="0.6" />
+    </>
+);
+
+export const SvgWater = () => (
+    <>
+        <rect x="0" y="0" width="32" height="32" fill="#2196F3" fillOpacity="0.6" />
+        <path d="M0 4 Q8 0 16 4 Q24 8 32 4" stroke="#BBDEFB" strokeWidth="1" fill="none" opacity="0.8" />
+        <circle cx="8" cy="12" r="2" fill="rgba(255,255,255,0.3)" />
+        <circle cx="24" cy="20" r="3" fill="rgba(255,255,255,0.3)" />
+        <circle cx="12" cy="26" r="1.5" fill="rgba(255,255,255,0.3)" />
+    </>
+);
+
+export const SvgLava = () => (
+    <>
+        <rect x="0" y="0" width="32" height="32" fill="#D32F2F" />
+        <path d="M0 0 Q8 6 16 0 Q24 6 32 0" fill="#FF5722" />
+        <circle cx="8" cy="16" r="3" fill="#FFC107" />
+        <circle cx="22" cy="24" r="4" fill="#FF9800" />
+        <circle cx="28" cy="10" r="2" fill="#FFEB3B" />
+    </>
+);
+
+export const SvgPipe = () => (
+    <>
+        <rect x="2" y="0" width="28" height="32" fill="#43A047" stroke="#1B5E20" strokeWidth="2" />
+        <rect x="0" y="0" width="32" height="8" fill="#4CAF50" stroke="#1B5E20" strokeWidth="2" />
+        <rect x="6" y="8" width="4" height="24" fill="rgba(0,0,0,0.1)" />
+        <rect x="8" y="2" width="2" height="4" fill="rgba(255,255,255,0.3)" />
+    </>
+);
+
+export const SvgSpring = () => (
+    <>
+        <rect x="2" y="26" width="28" height="6" fill="#333" />
+        <path d="M8 26 L24 26 L20 18 L26 12 L6 12 L12 18 Z" fill="#BBB" stroke="#555" strokeWidth="1" />
+        <rect x="2" y="8" width="28" height="4" fill="#D32F2F" />
+        <path d="M4 12 L2 26" stroke="#333" strokeWidth="1" />
+        <path d="M28 12 L30 26" stroke="#333" strokeWidth="1" />
+    </>
+);
+
+export const SvgBoostPad = () => (
+    <>
+        <rect x="0" y="24" width="32" height="8" fill="#333" />
+        <path d="M4 24 L12 24 L20 14 L12 14 Z" fill="#00E676" />
+        <path d="M14 24 L22 24 L30 14 L22 14 Z" fill="#00E676" />
+        <path d="M4 24 L20 14" stroke="#FFF" strokeWidth="1" opacity="0.5" />
+    </>
+);
+
+export const SvgLightning = () => (
+    <>
+        <circle cx="16" cy="16" r="14" fill="#212121" />
+        <path d="M18 4 L10 16 H16 L14 28 L24 14 H18 L18 4 Z" fill="#FFEB3B" stroke="#F57F17" strokeWidth="1" />
+    </>
+);
+
 export const SvgBrick = () => (
     <>
         <rect x="0" y="0" width="32" height="32" fill="currentColor" />
@@ -224,26 +299,19 @@ export const SvgTextDecoration = () => (
 
 export const SvgMario = () => (
     <>
-        {/* Legs */}
         <path d="M8 20 H24 V30 H8 Z" fill="#2244CC" />
-        {/* Shoes */}
         <path d="M6 28 H12 V32 H6 Z" fill="#441100" />
         <path d="M20 28 H26 V32 H20 Z" fill="#441100" />
-        {/* Shirt/Arms */}
         <path d="M2 14 H10 V20 H2 Z" fill="#EE2200" />
         <path d="M22 14 H30 V20 H22 Z" fill="#EE2200" />
         <rect x="10" y="14" width="12" height="16" fill="#2244CC" />
-        {/* Buttons */}
         <circle cx="10" cy="18" r="1.5" fill="#FFDD00" />
         <circle cx="22" cy="18" r="1.5" fill="#FFDD00" />
-        {/* Head */}
         <rect x="7" y="5" width="18" height="11" fill="#FFCCAA" rx="2" />
-        {/* Hat */}
         <path d="M4 5 H28 V9 H4 Z" fill="#EE2200" />
         <path d="M8 2 H24 V5 H8 Z" fill="#EE2200" />
         <circle cx="16" cy="4" r="2" fill="white" opacity="0.8"/>
         <text x="16" y="6.5" fontSize="3" fontWeight="bold" textAnchor="middle" fill="#EE2200">M</text>
-        {/* Features */}
         <rect x="20" y="8" width="2" height="4" fill="black" />
         <path d="M14 12 H26 V14 H14 Z" fill="black" /> 
         <rect x="24" y="10" width="3" height="3" fill="#FFCCAA" /> 
@@ -252,21 +320,15 @@ export const SvgMario = () => (
 
 export const SvgWukong = () => (
     <>
-        {/* Tail */}
         <path d="M4 22 Q0 18 4 14" stroke="#8B4513" strokeWidth="2" fill="none"/>
-        {/* Body */}
         <rect x="10" y="14" width="12" height="12" fill="#FFD700" rx="2"/>
         <rect x="8" y="26" width="6" height="6" fill="#8B4513" />
         <rect x="18" y="26" width="6" height="6" fill="#8B4513" />
-        {/* Scarf/Collar */}
         <path d="M10 14 H22 L16 18 Z" fill="#FF4500" />
-        {/* Head */}
         <circle cx="16" cy="10" r="8" fill="#8B4513" />
         <path d="M12 6 Q16 14 20 6 Q20 16 12 16 Q8 14 12 6" fill="#FFCCAA" />
-        {/* Eyes */}
         <circle cx="14" cy="9" r="1" fill="black" />
         <circle cx="18" cy="9" r="1" fill="black" />
-        {/* Circlet */}
         <path d="M9 5 Q16 1 23 5" stroke="gold" strokeWidth="2" fill="none" />
         <circle cx="16" cy="4" r="1.5" fill="red" />
     </>
