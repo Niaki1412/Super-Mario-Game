@@ -1,4 +1,5 @@
 
+
 export const API_BASE = '/api';
 
 export interface UserCreate {
@@ -109,6 +110,11 @@ export interface PublishIn {
   title: string;
   description?: string | null;
   cover?: string | null;
+}
+
+export interface AuditIn {
+  publish_map_id: number;
+  audit_status: number; // 2: Approve, 3: Reject
 }
 
 // Helper for handling headers
@@ -294,14 +300,6 @@ export const submitToAudit = async (public_map_id: number, token: string): Promi
     const params = new URLSearchParams();
     params.append('public_map_id', public_map_id.toString());
     
-    // Using query param based on prompt "参数：public_map_id". 
-    // If it's a JSON body, we would use body: JSON.stringify({ public_map_id }).
-    // Assuming JSON body for POST usually, but prompt format "参数：public_map_id" is ambiguous. 
-    // However, most other POSTs in this app use JSON body. Let's try query param first as it's a single ID often passed that way in some frameworks, or update if error.
-    // Actually, looking at `deleteMap`, it uses body. Let's use Query Param first as indicated by `public_map_id` listed simply. 
-    // Wait, `deleteMap` prompt was explicit about JSON structure. `submit_to_audit` prompt just said "Parameter: public_map_id".
-    // I will use query string for safety if it's a simple action, or body? Let's use Query params.
-    
     const res = await fetch(`${API_BASE}/public_map/submit_to_audit?${params.toString()}`, {
         method: 'POST',
         headers: getHeaders(token)
@@ -318,4 +316,18 @@ export const getAuditMaps = async (token: string): Promise<AuditMapListItem[]> =
     if (!res.ok) throw new Error('Failed to fetch audit maps');
     const json = await res.json();
     return json.data || [];
+};
+
+export const auditMap = async (data: AuditIn, token: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/public_map/audit`, {
+        method: 'POST',
+        headers: getHeaders(token),
+        body: JSON.stringify(data)
+    });
+    
+    if (!res.ok) throw new Error('Failed to perform audit action');
+    const json = await res.json();
+    if (json.code !== undefined && json.code !== 0) {
+       throw new Error(json.message || 'Audit action failed');
+    }
 };

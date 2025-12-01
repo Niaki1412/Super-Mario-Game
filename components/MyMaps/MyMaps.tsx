@@ -1,7 +1,9 @@
 
+
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem, getPublicMaps, PublicMapListItem, getUserProfile, getAuditMaps, AuditMapListItem, submitToAudit } from '../../api';
+import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem, getPublicMaps, PublicMapListItem, getUserProfile, getAuditMaps, AuditMapListItem, submitToAudit, auditMap } from '../../api';
 import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, EyeOff, Activity, Ban, RotateCcw, ChevronLeft, ChevronRight, FileEdit, LayoutGrid, Gamepad2, ImageOff, Calendar, ShieldAlert, Send } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
@@ -175,6 +177,26 @@ export const MyMaps: React.FC = () => {
           fetchPublished(); // Refresh to update status
       } catch (e) {
           showToast('Failed to submit for audit', 'error');
+      }
+  };
+
+  const handleAudit = async (publicMapId: number, status: number) => {
+      const action = status === 2 ? 'Approve' : 'Reject';
+      if (!window.confirm(`Are you sure you want to ${action} this map?`)) return;
+      
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      try {
+          await auditMap({
+              publish_map_id: publicMapId,
+              audit_status: status
+          }, token);
+          showToast(`Map ${action}d successfully`, 'success');
+          fetchAuditMapsData();
+      } catch (e: any) {
+          console.error(e);
+          showToast(e.message || `Failed to ${action} map`, 'error');
       }
   };
 
@@ -582,12 +604,18 @@ export const MyMaps: React.FC = () => {
                                                 </div>
                                             </div>
                                             
-                                            {/* Actions Placeholder - Backend might need Approve/Reject APIs later */}
+                                            {/* Actions */}
                                             <div className="flex flex-col gap-2 justify-center border-l border-gray-700 pl-4">
-                                                <button className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded text-sm font-bold transition-colors">
+                                                <button 
+                                                    onClick={() => handleAudit(map.id, 2)}
+                                                    className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded text-sm font-bold transition-colors"
+                                                >
                                                     Approve
                                                 </button>
-                                                <button className="px-4 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded text-sm font-bold transition-colors">
+                                                <button 
+                                                    onClick={() => handleAudit(map.id, 3)}
+                                                    className="px-4 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded text-sm font-bold transition-colors"
+                                                >
                                                     Reject
                                                 </button>
                                             </div>
