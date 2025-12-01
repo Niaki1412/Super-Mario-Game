@@ -222,7 +222,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Spring',
       category: 'trigger',
       color: 0xD32F2F,
-      attributes: { gravity: true, solid: true, bounceForce: -18 },
+      // Fixed: gravity false to prevent falling in editor/game unless meant to be dynamic
+      attributes: { gravity: false, solid: true, bounceForce: -18 },
       renderSVG: () => <SvgSpring />,
       renderPixi: (g, _l, x, y, w, h, data) => {
           // Base
@@ -265,7 +266,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Lightning Trap',
       category: 'enemy',
       color: 0xFFEB3B,
-      attributes: { gravity: false, solid: false, lethal: true },
+      attributes: { gravity: false, solid: false, lethal: true, speed: 0 },
       renderSVG: () => <SvgLightning />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.circle(x + w/2, y + h/2, w/2).fill(0x212121);
@@ -504,7 +505,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Piranha Plant',
     category: 'enemy',
     color: 0x008000,
-    attributes: { points: 150, gravity: false, solid: true }, // solid=true for the pipe base
+    attributes: { points: 150, gravity: false, solid: true, speed: 0 },
     renderSVG: () => <SvgPiranhaPlant />,
     renderPixi: (g, _l, x, y, w, h, data) => {
         // 1. Draw Plant Head (Behind Pipe if possible, but painter's algorithm says draw first)
@@ -538,7 +539,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Pop-up Spike',
       category: 'enemy',
       color: 0x888888,
-      attributes: { points: 0, gravity: false, lethal: true },
+      attributes: { points: 0, gravity: false, lethal: true, speed: 0 },
       renderSVG: () => <SvgPopUpSpike />,
       renderPixi: (g, _l, x, y, w, h, data) => {
           // Base
@@ -568,7 +569,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Rotating Spike',
       category: 'enemy',
       color: 0x333333,
-      attributes: { points: 0, gravity: false, lethal: true },
+      attributes: { points: 0, gravity: false, lethal: true, speed: 0 },
       renderSVG: () => <SvgRotatingSpike />,
       renderPixi: (g, _l, x, y, w, h, data) => {
           // Pivot
