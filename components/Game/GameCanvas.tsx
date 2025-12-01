@@ -221,8 +221,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     hasGravity: config.attributes?.gravity ?? true,
                     text: obj.text,
                     isShell: false,
+                    // New Enemy States
                     plantState: 'hidden', plantTimer: 0, plantOffset: 0,
-                    spikeState: 'hidden', spikeTimer: 0, rotationAngle: 0
+                    spikeState: 'hidden', spikeTimer: 0, rotationAngle: 0,
+                    jumpTimer: 0, shootTimer: 0,
+                    bombState: 'walking', bombTimer: 0
                 });
             });
 
@@ -318,26 +321,71 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
     };
 
-    const spawnBullet = (player: Entity) => {
+    const spawnBullet = (source: Entity, isPlayerBullet: boolean) => {
         const tileSize = mapRef.current.tileSize;
         const scaleRatio = tileSize / 32;
-        const dir = lastDirRef.current;
+        
+        const dir = source.vx !== 0 ? Math.sign(source.vx) : lastDirRef.current;
         const isWukong = character === 'wukong';
+        
+        const variant = isPlayerBullet ? (isWukong ? 'banana' : 'fireball') : 'fireball';
         
         entitiesRef.current.push({
             id: `bullet-${Math.random()}`,
             type: 'Bullet',
-            x: player.x + (dir > 0 ? player.w : -PLAYER_CONFIG.projectile.width * scaleRatio),
-            y: player.y + player.h * (isWukong ? 0.3 : 0.4),
+            x: source.x + (dir > 0 ? source.w : -PLAYER_CONFIG.projectile.width * scaleRatio),
+            y: source.y + source.h * 0.4,
             w: PLAYER_CONFIG.projectile.width * scaleRatio,
             h: PLAYER_CONFIG.projectile.height * scaleRatio,
-            vx: dir * PLAYER_CONFIG.physics.bulletSpeed * scaleRatio,
+            vx: dir * (isPlayerBullet ? PLAYER_CONFIG.physics.bulletSpeed : 3) * scaleRatio,
             vy: isWukong ? -4 : 0,
             isDead: false, grounded: false, isBullet: true,
-            bulletVariant: isWukong ? 'banana' : 'fireball',
+            isEnemy: !isPlayerBullet, // Enemy bullets hurt player
+            bulletVariant: variant,
             hasGravity: isWukong
         } as ExtendedEntity);
+        
         audioManager.playShoot();
+    };
+
+    const explodeBomb = (bomb: ExtendedEntity) => {
+        spawnParticles(bomb.x + bomb.w/2, bomb.y + bomb.h/2, 0xFF4400);
+        bomb.isDead = true;
+        audioManager.playBump(); // Boom
+
+        // Radius check for damage
+        const cx = bomb.x + bomb.w/2;
+        const cy = bomb.y + bomb.h/2;
+        const radius = mapRef.current.tileSize * 2;
+
+        entitiesRef.current.forEach(e => {
+            if(e === bomb || e.isDead) return;
+            const dx = (e.x + e.w/2) - cx;
+            const dy = (e.y + e.h/2) - cy;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < radius) {
+                if (e.isPlayer) takeDamage(e);
+                else { e.isDead = true; addScore(100); spawnParticles(e.x, e.y, 0x555555); }
+            }
+        });
+
+        // Destroy blocks
+        const map = mapRef.current;
+        const tileSize = map.tileSize;
+        const tx = Math.floor(cx / tileSize);
+        const ty = Math.floor(cy / tileSize);
+        
+        for(let y = ty - 1; y <= ty + 1; y++) {
+            for(let x = tx - 1; x <= tx + 1; x++) {
+                if (y < 0 || y >= map.height || x < 0 || x >= map.width) continue;
+                const tid = map.tiles[y][x];
+                const el = getElementById(tid);
+                if (el?.attributes?.destructible) {
+                    map.tiles[y][x] = 0;
+                    spawnParticles(x * tileSize, y * tileSize, el.color);
+                }
+            }
+        }
     };
 
     const handleTileCollision = (entity: ExtendedEntity, map: GameMap, axis: 'x' | 'y') => {
@@ -494,14 +542,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 }
 
                 entities.forEach(other => {
-                    if (other === entity || other.isDead || !other.isEnemy) return;
-                    if (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike') return;
+                    if (other === entity || other.isDead) return;
+                    
+                    // Logic: Player Bullet hits Enemy, Enemy Bullet hits Player
+                    const isFriendlyFire = (entity.isEnemy && other.isEnemy) || (!entity.isEnemy && other.isPlayer);
+                    if (isFriendlyFire) return;
+
                     if (checkRectCollision(entity, other)) {
                         entity.isDead = true;
-                        other.isDead = true;
-                        addScore(100);
-                        spawnParticles(other.x, other.y, 0xFF4400);
-                        audioManager.playStomp(); 
+                        if (other.isPlayer) {
+                            takeDamage(other);
+                        } else {
+                            other.isDead = true;
+                            addScore(100);
+                            spawnParticles(other.x, other.y, 0xFF4400);
+                            audioManager.playStomp();
+                        }
                     }
                 });
                 return;
@@ -561,7 +617,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 
                 if (keys[controls.shoot]) {
                     if (entity.canShoot && (!entity.shootCooldown || entity.shootCooldown <= 0)) {
-                        spawnBullet(entity);
+                        spawnBullet(entity, true);
                         entity.shootCooldown = GAME_SETTINGS.shootCooldown; 
                     }
                 }
@@ -584,6 +640,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
             if (entity.isEnemy) {
                  if (entity.type === 'Piranha Plant') {
+                     // Existing Logic
                      entity.vx = 0; entity.vy = 0;
                      entity.plantTimer = (entity.plantTimer || 0) + delta;
                      const MAX_HEIGHT = -tileSize * 0.8;
@@ -599,7 +656,43 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                          entity.plantOffset = (entity.plantOffset || 0) + MOVE_SPEED * delta;
                          if (entity.plantOffset >= 0) { entity.plantOffset = 0; entity.plantState = 'hidden'; entity.plantTimer = 0; }
                      }
+                 } else if (entity.type === 'Bouncing Hopper') {
+                     if (entity.grounded) {
+                         entity.vx = 0;
+                         entity.jumpTimer = (entity.jumpTimer || 0) + delta;
+                         if (entity.jumpTimer > 60) {
+                             entity.vy = -12 * scaleRatio; // High jump
+                             entity.grounded = false;
+                             entity.jumpTimer = 0;
+                         }
+                     }
+                 } else if (entity.type === 'Fire Dino') {
+                     entity.shootTimer = (entity.shootTimer || 0) + delta;
+                     if (entity.shootTimer > 180) {
+                         // Only shoot if player is within range
+                         const player = entities.find(p => p.isPlayer);
+                         if (player && Math.abs(player.x - entity.x) < tileSize * 8) {
+                             spawnBullet(entity, false);
+                         }
+                         entity.shootTimer = 0;
+                     }
+                 } else if (entity.type === 'Bob-omb') {
+                     const player = entities.find(p => p.isPlayer);
+                     if (entity.bombState === 'walking') {
+                         // Ignite if player is close
+                         if (player && Math.abs(player.x - entity.x) < tileSize * 3 && Math.abs(player.y - entity.y) < tileSize * 2) {
+                             entity.bombState = 'ignited';
+                             entity.bombTimer = 120; // 2 seconds
+                             entity.vx = 0; // Stop moving when ignited
+                         }
+                     } else if (entity.bombState === 'ignited') {
+                         entity.bombTimer = (entity.bombTimer || 0) - delta;
+                         if (entity.bombTimer <= 0) {
+                             explodeBomb(entity);
+                         }
+                     }
                  } else if (entity.type === 'Pop-up Spike') {
+                     // Existing Logic
                      entity.vx = 0; entity.vy = 0;
                      entity.spikeTimer = (entity.spikeTimer || 0) + delta;
                      if (entity.spikeState === 'hidden') { if (entity.spikeTimer > 120) { entity.spikeState = 'warning'; entity.spikeTimer = 0; }
@@ -679,13 +772,28 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                                 return;
                             }
                             if (other.type === 'Rotating Spike') return;
+                            if (other.type === 'Bob-omb' && other.bombState === 'ignited') {
+                                takeDamage(entity); // Touch ignored bomb hurts
+                                return;
+                            }
 
                             const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
                             if (isStomp) {
-                                if (other.type === 'Turtle') {
+                                if (other.type === 'Turtle' || other.type === 'Flying Turtle') {
                                     entity.vy = phys.bounceForce * scaleRatio;
                                     audioManager.playStomp();
-                                    if (!other.isShell) { other.isShell = true; other.vx = 0; addScore(100); } else { other.vx = 0; }
+                                    if (!other.isShell) { 
+                                        other.isShell = true; 
+                                        other.vx = 0; 
+                                        other.hasGravity = true; // Flying turtle loses wings
+                                        addScore(100); 
+                                    } else { other.vx = 0; }
+                                } else if (other.type === 'Bob-omb') {
+                                    // Stomping bob-omb ignites it and kicks it away slightly
+                                    entity.vy = phys.bounceForce * scaleRatio;
+                                    other.bombState = 'ignited';
+                                    other.bombTimer = 120;
+                                    other.vx = 0;
                                 } else {
                                     other.isDead = true;
                                     entity.vy = phys.bounceForce * scaleRatio; 
@@ -694,7 +802,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                                     audioManager.playStomp();
                                 }
                             } else {
-                                if (other.type === 'Turtle' && other.isShell && Math.abs(other.vx) < 0.1) {
+                                if ((other.type === 'Turtle' || other.type === 'Flying Turtle') && other.isShell && Math.abs(other.vx) < 0.1) {
                                     const dir = entity.x < other.x ? 1 : -1;
                                     other.vx = dir * 8 * scaleRatio;
                                     other.x += dir * 4; 
@@ -913,8 +1021,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                         const bx = e.x + e.w/2;
                         const by = e.y + e.h/2;
                         g.moveTo(bx - 5, by - 5).quadraticCurveTo(bx, by + 5, bx + 5, by - 5).stroke({width: 4, color: 0xFFD700});
-                    } else {
-                        g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
+                    } else if (e.bulletVariant === 'fireball') {
+                         g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
+                         g.circle(e.x + e.w/2, e.y + e.h/2, e.w/4).fill(0xFFFF00);
                     }
                 }
             }

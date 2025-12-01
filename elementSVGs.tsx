@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export const SvgGround = () => (
@@ -73,6 +74,60 @@ export const SvgTurtle = () => (
         <circle cx="10" cy="12" r="5" fill="#32CD32" />
         <circle cx="9" cy="11" r="1.5" fill="black" />
         <path d="M12 26 L8 30 M20 26 L24 30" stroke="#32CD32" strokeWidth="3" />
+    </>
+);
+
+export const SvgFlyingTurtle = () => (
+    <>
+        <ellipse cx="16" cy="20" rx="10" ry="8" fill="#FF4500" />
+        <ellipse cx="16" cy="20" rx="7" ry="5" stroke="rgba(255,255,255,0.3)" fill="none" />
+        <circle cx="10" cy="12" r="5" fill="#FFA07A" />
+        <circle cx="9" cy="11" r="1.5" fill="black" />
+        {/* Wings */}
+        <path d="M14 14 Q8 4 2 10 Q6 16 12 18 Z" fill="white" stroke="#CCC" strokeWidth="1" />
+        <path d="M20 14 Q26 6 32 10 Q28 16 22 18 Z" fill="white" stroke="#CCC" strokeWidth="1" />
+    </>
+);
+
+export const SvgHopper = () => (
+    <>
+        <path d="M8 30 L24 30 L20 22 L26 16 L6 16 L12 22 Z" fill="#777" />
+        <circle cx="16" cy="14" r="10" fill="#4B0082" />
+        <circle cx="12" cy="12" r="3" fill="yellow" />
+        <circle cx="20" cy="12" r="3" fill="yellow" />
+        <path d="M10 24 L6 28 M22 24 L26 28" stroke="black" strokeWidth="2" />
+        {/* Spike on top */}
+        <path d="M16 4 L14 8 H18 Z" fill="#999" />
+    </>
+);
+
+export const SvgFireDino = () => (
+    <>
+        <path d="M8 20 Q12 10 20 12 L24 16 L20 26 L12 28 Z" fill="#DC143C" />
+        <rect x="12" y="26" width="4" height="6" fill="#DC143C" />
+        <rect x="18" y="26" width="4" height="6" fill="#DC143C" />
+        <path d="M22 14 L28 14 L26 18 Z" fill="yellow" /> 
+        <circle cx="20" cy="14" r="1.5" fill="black" />
+        {/* Spikes */}
+        <path d="M10 16 L6 14 L8 18 Z" fill="white" />
+        <path d="M12 12 L8 10 L10 14 Z" fill="white" />
+    </>
+);
+
+export const SvgBomb = () => (
+    <>
+        <circle cx="16" cy="18" r="10" fill="black" />
+        {/* Feet */}
+        <path d="M8 26 L4 30 L10 30 Z" fill="#FFD700" />
+        <path d="M24 26 L28 30 L22 30 Z" fill="#FFD700" />
+        {/* Fuse */}
+        <rect x="14" y="4" width="4" height="6" fill="#888" />
+        <circle cx="16" cy="4" r="2" fill="orange" />
+        {/* Shine */}
+        <path d="M12 14 Q14 12 16 14" stroke="#333" strokeWidth="1" fill="none" />
+        <circle cx="20" cy="14" r="2" fill="white" opacity="0.5" />
+        {/* Key */}
+        <path d="M26 18 L30 14 L30 22 Z" fill="#CCC" />
     </>
 );
 

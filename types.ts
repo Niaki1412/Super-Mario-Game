@@ -108,6 +108,12 @@ export interface Entity extends Rect {
   spikeTimer?: number;
   rotationAngle?: number;
 
+  // New Enemy Types
+  jumpTimer?: number; // For Bouncing Hopper
+  shootTimer?: number; // For Fire Dino
+  bombState?: 'walking' | 'ignited'; // For Bomb
+  bombTimer?: number; // For Bomb explosion
+
   // Physics specific
   hasGravity?: boolean;
 

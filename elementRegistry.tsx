@@ -1,4 +1,3 @@
-
 import React from 'react';
 import * as PIXI from 'pixi.js';
 import { ElementConfig } from './types';
@@ -6,7 +5,7 @@ import {
     SvgGround, SvgBrick, SvgHardBlock, SvgQuestionBlock, SvgInvisibleDeathBlock, SvgEmptyBlock,
     SvgGoomba, SvgTurtle, SvgPiranhaPlant, SvgPopUpSpike, SvgRotatingSpike,
     SvgCoin, SvgMushroom, SvgFireMushroom, SvgCloud, SvgBullet, SvgPlayerStart, SvgFlagpole, SvgTextDecoration,
-    SvgMario
+    SvgMario, SvgFlyingTurtle, SvgHopper, SvgFireDino, SvgBomb
 } from './elementSVGs';
 
 export interface RegistryItem extends ElementConfig {
@@ -198,6 +197,145 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
             g.ellipse(x + w*0.55, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
         }
     }
+  },
+  {
+      id: 112,
+      type: 'object',
+      name: 'Flying Turtle',
+      category: 'enemy',
+      color: 0xFF4500,
+      attributes: { points: 300, gravity: false, speed: 2 },
+      renderSVG: () => <SvgFlyingTurtle />,
+      renderPixi: (g, _l, x, y, w, h, data) => {
+          const vx = data?.vx || -1; // Default to moving left
+          const isFacingRight = vx > 0;
+          const tick = Date.now() / 150;
+          const wingOffset = Math.sin(tick) * 5;
+
+          const tx = (localX: number) => isFacingRight ? (x + w - localX) : (x + localX);
+
+          // Wings (Back)
+          g.moveTo(tx(w*0.6), y+h*0.3)
+           .quadraticCurveTo(tx(w*0.8), y+h*0.1-wingOffset, tx(w*0.9), y+h*0.2)
+           .lineTo(tx(w*0.6), y+h*0.4)
+           .fill(0xFFFFFF).stroke({width:1, color: 0xCCCCCC});
+
+          // Body (Red Shell)
+          g.ellipse(x + w*0.55, y + h*0.6, w*0.35, h*0.25).fill(0xFF4500);
+          g.ellipse(x + w*0.55, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
+
+          // Head
+          g.circle(tx(w*0.25), y + h*0.35, w*0.2).fill(0xFFA07A);
+          g.circle(tx(w*0.2), y + h*0.3, 2).fill(0x000000);
+
+          // Wings (Front)
+          g.moveTo(tx(w*0.5), y+h*0.3)
+           .quadraticCurveTo(tx(w*0.7), y+h*0.05-wingOffset, tx(w*0.85), y+h*0.15)
+           .lineTo(tx(w*0.5), y+h*0.4)
+           .fill(0xFFFFFF).stroke({width:1, color: 0xCCCCCC});
+      }
+  },
+  {
+      id: 113,
+      type: 'object',
+      name: 'Bouncing Hopper',
+      category: 'enemy',
+      color: 0x4B0082,
+      attributes: { points: 200, gravity: true, speed: 1.5 },
+      renderSVG: () => <SvgHopper />,
+      renderPixi: (g, _l, x, y, w, h, data) => {
+          const compression = data?.grounded ? 0.2 * h : 0;
+          const bodyY = y + h*0.4 + compression;
+          
+          // Spring Legs
+          g.moveTo(x + w*0.3, y + h).lineTo(x + w*0.2, bodyY).stroke({width: 2, color: 0x555555});
+          g.moveTo(x + w*0.7, y + h).lineTo(x + w*0.8, bodyY).stroke({width: 2, color: 0x555555});
+
+          // Body
+          g.circle(x + w*0.5, bodyY, w*0.35).fill(0x4B0082);
+          // Eyes
+          g.circle(x + w*0.35, bodyY - h*0.05, 3).fill(0xFFFF00);
+          g.circle(x + w*0.65, bodyY - h*0.05, 3).fill(0xFFFF00);
+          
+          // Spike on top
+          g.moveTo(x + w*0.5, bodyY - w*0.35)
+           .lineTo(x + w*0.4, bodyY - w*0.5)
+           .lineTo(x + w*0.6, bodyY - w*0.5)
+           .fill(0x999999);
+      }
+  },
+  {
+      id: 114,
+      type: 'object',
+      name: 'Fire Dino',
+      category: 'enemy',
+      color: 0xDC143C,
+      attributes: { points: 500, gravity: true, speed: 0.5 },
+      renderSVG: () => <SvgFireDino />,
+      renderPixi: (g, _l, x, y, w, h, data) => {
+          const vx = data?.vx || 0;
+          const isFacingRight = vx > 0;
+          const tx = (localX: number, width: number = 0) => isFacingRight ? (x + w - localX - width) : (x + localX);
+          
+          // Feet
+          const tick = Date.now() / 200;
+          const step = Math.sin(tick) * 3;
+          g.rect(tx(w*0.3 + step, w*0.15), y + h*0.8, w*0.15, h*0.2).fill(0xDC143C);
+          g.rect(tx(w*0.55 - step, w*0.15), y + h*0.8, w*0.15, h*0.2).fill(0xDC143C);
+
+          // Body
+          g.moveTo(tx(w*0.2), y + h*0.6)
+           .lineTo(tx(w*0.4), y + h*0.3)
+           .lineTo(tx(w*0.8), y + h*0.4)
+           .lineTo(tx(w*0.7), y + h*0.8)
+           .lineTo(tx(w*0.3), y + h*0.85)
+           .fill(0xDC143C);
+
+          // Mouth
+          g.moveTo(tx(w*0.7), y + h*0.4).lineTo(tx(w*0.9), y+h*0.4).lineTo(tx(w*0.8), y+h*0.55).fill(0xFFFF00);
+          
+          // Eye
+          g.circle(tx(w*0.6), y + h*0.4, 2).fill(0x000000);
+
+          // Spikes
+          g.moveTo(tx(w*0.3), y + h*0.5).lineTo(tx(w*0.2), y+h*0.4).lineTo(tx(w*0.35), y+h*0.4).fill(0xFFFFFF);
+          g.moveTo(tx(w*0.4), y + h*0.4).lineTo(tx(w*0.35), y+h*0.25).lineTo(tx(w*0.45), y+h*0.35).fill(0xFFFFFF);
+      }
+  },
+  {
+      id: 115,
+      type: 'object',
+      name: 'Bob-omb',
+      category: 'enemy',
+      color: 0x000000,
+      attributes: { points: 150, gravity: true, speed: 1.5, lethal: true },
+      renderSVG: () => <SvgBomb />,
+      renderPixi: (g, _l, x, y, w, h, data) => {
+          const isIgnited = data?.bombState === 'ignited';
+          const tick = Date.now() / 50;
+          const flash = isIgnited && Math.floor(tick) % 2 === 0;
+          const color = flash ? 0xFF4444 : 0x000000;
+          
+          // Feet
+          const walk = Math.sin(Date.now() / 100) * 3;
+          g.ellipse(x + w*0.3 + walk, y + h*0.9, w*0.15, h*0.1).fill(0xFFD700);
+          g.ellipse(x + w*0.7 - walk, y + h*0.9, w*0.15, h*0.1).fill(0xFFD700);
+
+          // Body
+          g.circle(x + w*0.5, y + h*0.55, w*0.35).fill(color);
+          
+          // Shine
+          if (!flash) {
+             g.circle(x + w*0.65, y + h*0.4, w*0.08).fill({color: 0xFFFFFF, alpha: 0.5});
+          }
+
+          // Fuse
+          g.rect(x + w*0.45, y + h*0.1, w*0.1, h*0.15).fill(0x888888);
+          g.circle(x + w*0.5, y + h*0.1, w*0.05).fill(0xFFA500);
+
+          // Key
+          g.moveTo(x + w*0.85, y + h*0.5).lineTo(x + w*0.95, y + h*0.4).lineTo(x + w*0.95, y + h*0.6).fill(0xCCCCCC);
+      }
   },
   {
     id: 107,
