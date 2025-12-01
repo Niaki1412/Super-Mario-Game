@@ -333,3 +333,44 @@ export const SvgWukong = () => (
         <circle cx="16" cy="4" r="1.5" fill="red" />
     </>
 );
+
+export const SvgNinja = () => (
+    <>
+        <path d="M8 30 L4 20 L28 20 L24 30 Z" fill="#111" />
+        <rect x="10" y="12" width="12" height="14" fill="#333" />
+        <rect x="8" y="26" width="6" height="6" fill="#111" />
+        <rect x="18" y="26" width="6" height="6" fill="#111" />
+        {/* Scarf */}
+        <path d="M6 14 Q2 10 0 16" stroke="#C00" strokeWidth="3" fill="none" />
+        <circle cx="16" cy="10" r="7" fill="#222" />
+        <path d="M12 8 H20 V12 H12 Z" fill="#FFE0B2" />
+        <rect x="13" y="9" width="2" height="1" fill="black" />
+        <rect x="17" y="9" width="2" height="1" fill="black" />
+        <path d="M14 4 L18 4 L16 1 Z" fill="#555" />
+    </>
+);
+
+export const SvgMage = () => (
+    <>
+        <path d="M4 30 L16 10 L28 30 Z" fill="#6A1B9A" />
+        <path d="M16 10 L12 2 L20 2 Z" fill="#9C27B0" />
+        <circle cx="16" cy="14" r="5" fill="#E1BEE7" />
+        <path d="M6 30 L16 32 L26 30" stroke="#4A148C" strokeWidth="2" />
+        {/* Staff */}
+        <line x1="24" y1="30" x2="30" y2="10" stroke="#8D6E63" strokeWidth="2" />
+        <circle cx="30" cy="10" r="3" fill="#00E5FF" opacity="0.8" />
+    </>
+);
+
+export const SvgTank = () => (
+    <>
+        <rect x="6" y="24" width="20" height="6" fill="#455A64" rx="2" />
+        <circle cx="10" cy="27" r="2" fill="#263238" />
+        <circle cx="16" cy="27" r="2" fill="#263238" />
+        <circle cx="22" cy="27" r="2" fill="#263238" />
+        <rect x="8" y="14" width="16" height="10" fill="#607D8B" />
+        <rect x="12" y="10" width="8" height="6" fill="#90A4AE" />
+        <circle cx="14" cy="13" r="1.5" fill="#00FF00" />
+        <rect x="20" y="16" width="10" height="4" fill="#37474F" />
+    </>
+);

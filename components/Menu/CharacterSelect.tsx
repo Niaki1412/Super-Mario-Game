@@ -3,62 +3,35 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Lock, Zap, Activity, TrendingUp, CheckCircle, HelpCircle } from 'lucide-react';
 import { CHARACTERS } from '../../playerConfig';
-import { SvgMario, SvgWukong } from '../../elementSVGs';
-
-// Interface for UI display data
-interface CharDisplayData {
-    id: string;
-    name: string;
-    isLocked: boolean;
-    description: string;
-    stats: {
-        speed: number; // 0-10
-        jump: number; // 0-10
-        difficulty: number; // 0-10
-    };
-    ability: string;
-    renderIcon: () => React.ReactNode;
-    themeColor: string;
-}
 
 export const CharacterSelect: React.FC = () => {
   const navigate = useNavigate();
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Define the 10 slots
-  const characterList: CharDisplayData[] = [
-      {
-          id: 'mario',
-          name: 'Mario',
-          isLocked: false,
-          description: 'The balanced hero. Good for beginners.',
-          stats: { speed: 6, jump: 6, difficulty: 3 },
-          ability: 'Fireball & Growth',
-          themeColor: 'from-red-500 to-red-700',
-          renderIcon: () => <SvgMario />
-      },
-      {
-          id: 'wukong',
-          name: 'Sun Wukong',
-          isLocked: false,
-          description: 'High agility and transformation powers.',
-          stats: { speed: 9, jump: 8, difficulty: 7 },
-          ability: 'Transform & Flight',
-          themeColor: 'from-yellow-500 to-orange-600',
-          renderIcon: () => <SvgWukong />
-      },
-      // Generate 8 Locked Slots
-      ...Array.from({ length: 8 }).map((_, i) => ({
-          id: `locked_${i}`,
-          name: 'Unknown',
-          isLocked: true,
-          description: 'This hero has not joined your team yet.',
-          stats: { speed: 0, jump: 0, difficulty: 0 },
-          ability: '???',
-          themeColor: 'from-gray-700 to-gray-800',
-          renderIcon: () => <HelpCircle size={64} className="text-gray-600" />
-      }))
-  ];
+  // Convert CONFIG to Array
+  const unlockedChars = Object.values(CHARACTERS).map(char => ({
+      id: char.id,
+      name: char.name,
+      isLocked: false,
+      description: char.description,
+      stats: char.stats,
+      ability: char.abilityName,
+      themeColor: char.visuals.themeColor,
+      renderIcon: () => React.createElement(char.visuals.icon)
+  }));
+
+  const lockedSlots = Array.from({ length: 10 - unlockedChars.length }).map((_, i) => ({
+      id: `locked_${i}`,
+      name: 'Unknown',
+      isLocked: true,
+      description: 'This hero has not joined your team yet.',
+      stats: { speed: 0, jump: 0, difficulty: 0 },
+      ability: '???',
+      themeColor: 'from-gray-700 to-gray-800',
+      renderIcon: () => <HelpCircle size={64} className="text-gray-600" />
+  }));
+
+  const characterList = [...unlockedChars, ...lockedSlots];
 
   // Load initial selection
   useEffect(() => {
@@ -132,25 +105,21 @@ export const CharacterSelect: React.FC = () => {
           {/* Cards Container */}
           <div className="relative w-full h-[500px] flex items-center justify-center">
               {characterList.map((char, index) => {
-                  // Calculate relative position for the 3D effect
-                  // We only care about Previous, Current, Next for visuals. Others hidden.
                   let offset = (index - activeIndex);
                   
-                  // Handle wrap-around logic for visual positioning
                   if (offset < -Math.floor(characterList.length / 2)) offset += characterList.length;
                   if (offset > Math.floor(characterList.length / 2)) offset -= characterList.length;
 
-                  // Determine styles based on offset
                   const isActive = offset === 0;
-                  const isVisible = Math.abs(offset) <= 1; // Only show adjacent cards
+                  const isVisible = Math.abs(offset) <= 1;
                   
                   if (!isVisible) return null;
 
-                  const xTrans = offset * 280; // Distance between cards
+                  const xTrans = offset * 280;
                   const scale = isActive ? 1.1 : 0.8;
                   const opacity = isActive ? 1 : 0.4;
                   const zIndex = isActive ? 10 : 5;
-                  const rotateY = offset * -25; // 3D rotation
+                  const rotateY = offset * -25;
 
                   return (
                       <div
@@ -168,7 +137,6 @@ export const CharacterSelect: React.FC = () => {
                         }}
                         onClick={() => setActiveIndex(index)}
                       >
-                          {/* Card Content */}
                           <div className={`w-32 h-32 mb-6 transition-transform duration-500 ${isActive ? 'scale-110' : 'scale-100'}`}>
                              {char.isLocked ? (
                                  <div className="w-full h-full flex items-center justify-center text-gray-700 font-black text-6xl">?</div>
@@ -193,7 +161,6 @@ export const CharacterSelect: React.FC = () => {
               })}
           </div>
           
-          {/* Pagination Dots */}
           <div className="absolute bottom-12 flex gap-2">
               {characterList.map((_, i) => (
                   <div 
@@ -206,7 +173,6 @@ export const CharacterSelect: React.FC = () => {
 
       {/* RIGHT SIDE: INFO PANEL */}
       <div className="w-[40%] h-full bg-gray-900/80 backdrop-blur-md border-l border-gray-800 p-10 flex flex-col justify-center shadow-2xl z-20">
-            
             <div className="mb-8">
                 <h1 className={`text-5xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r ${activeChar.themeColor}`}>
                     {activeChar.name}
@@ -216,29 +182,12 @@ export const CharacterSelect: React.FC = () => {
                 </p>
             </div>
 
-            {/* Stats Grid */}
             <div className="bg-gray-800/50 rounded-2xl p-6 mb-8 border border-gray-700">
-                <StatBar 
-                    label="Speed" 
-                    value={activeChar.stats.speed} 
-                    icon={Zap} 
-                    color="bg-blue-500" 
-                />
-                <StatBar 
-                    label="Jump Power" 
-                    value={activeChar.stats.jump} 
-                    icon={TrendingUp} 
-                    color="bg-green-500" 
-                />
-                <StatBar 
-                    label="Difficulty" 
-                    value={activeChar.stats.difficulty} 
-                    icon={Activity} 
-                    color="bg-red-500" 
-                />
+                <StatBar label="Speed" value={activeChar.stats.speed} icon={Zap} color="bg-blue-500" />
+                <StatBar label="Jump Power" value={activeChar.stats.jump} icon={TrendingUp} color="bg-green-500" />
+                <StatBar label="Difficulty" value={activeChar.stats.difficulty} icon={Activity} color="bg-red-500" />
             </div>
 
-            {/* Special Ability */}
             <div className="mb-10">
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Special Ability</h3>
                 <div className="flex items-center gap-4 bg-gray-800 p-4 rounded-xl border border-gray-700 border-l-4 border-l-yellow-500">
@@ -252,7 +201,6 @@ export const CharacterSelect: React.FC = () => {
                 </div>
             </div>
 
-            {/* Action Button */}
             <button
                 onClick={handleSelect}
                 disabled={activeChar.isLocked}
@@ -263,18 +211,9 @@ export const CharacterSelect: React.FC = () => {
                         : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-blue-500/30'}
                 `}
             >
-                {activeChar.isLocked ? (
-                    <>
-                        <Lock size={20} /> Locked Character
-                    </>
-                ) : (
-                    <>
-                        <CheckCircle size={20} /> Select & Play
-                    </>
-                )}
+                {activeChar.isLocked ? <><Lock size={20} /> Locked Character</> : <><CheckCircle size={20} /> Select & Play</>}
             </button>
       </div>
-
     </div>
   );
 };

@@ -99,6 +99,11 @@ export interface Entity extends Rect {
   jumpCount?: number; // For double jump
   isCrouching?: boolean; // For crouch state
   
+  // New Player Ability States
+  isHovering?: boolean; // For Stella
+  hoverTimer?: number;
+  spikeImmunity?: boolean; // For Iron
+  
   // Enemy specific
   patrolCenter?: number;
   isShell?: boolean; // For Turtle enemies
