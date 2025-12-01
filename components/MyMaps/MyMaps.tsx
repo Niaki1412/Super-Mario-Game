@@ -1,14 +1,18 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem, getPublicMaps, PublicMapListItem } from '../../api';
-import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, EyeOff, Activity, Ban, RotateCcw, ChevronLeft, ChevronRight, FileEdit, LayoutGrid, Gamepad2, ImageOff, Calendar } from 'lucide-react';
+import { getMyMaps, deleteMap, restoreMap, publishMap, uploadFile, MapListItem, getPublicMaps, PublicMapListItem, getUserProfile, getAuditMaps, AuditMapListItem, submitToAudit } from '../../api';
+import { ArrowLeft, Edit, Trash2, Map as MapIcon, Plus, Globe, Upload, X, Loader2, Image as ImageIcon, CheckCircle, AlertTriangle, EyeOff, Activity, Ban, RotateCcw, ChevronLeft, ChevronRight, FileEdit, LayoutGrid, Gamepad2, ImageOff, Calendar, ShieldAlert, Send } from 'lucide-react';
 
 export const MyMaps: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Tab State derived from URL to persist across refreshes
-  const activeTab = searchParams.get('tab') === 'published' ? 'published' : 'drafts';
+  const activeTab = searchParams.get('tab') || 'drafts';
+
+  // User Role State
+  const [userRole, setUserRole] = useState<string>('0');
 
   // Drafts Data
   const [maps, setMaps] = useState<MapListItem[]>([]);
@@ -18,6 +22,10 @@ export const MyMaps: React.FC = () => {
   // Published Maps Data
   const [publishedMaps, setPublishedMaps] = useState<PublicMapListItem[]>([]);
   const [loadingPublished, setLoadingPublished] = useState(false);
+
+  // Audit Maps Data
+  const [auditMaps, setAuditMaps] = useState<AuditMapListItem[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   // Pagination State (Drafts only)
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,6 +52,19 @@ export const MyMaps: React.FC = () => {
   const [isPublishing, setIsPublishing] = useState(false);
 
   // --- Data Fetching ---
+
+  useEffect(() => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+          navigate('/');
+          return;
+      }
+      
+      // Fetch User Role
+      getUserProfile(token).then(profile => {
+          setUserRole(profile.role);
+      }).catch(console.error);
+  }, []);
 
   const fetchDrafts = async (page: number) => {
     const token = localStorage.getItem('access_token');
@@ -78,17 +99,30 @@ export const MyMaps: React.FC = () => {
       }
   };
 
+  const fetchAuditMapsData = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+      try {
+          setLoadingAudit(true);
+          const data = await getAuditMaps(token);
+          setAuditMaps(data);
+      } catch (err) {
+          console.error(err);
+      } finally {
+          setLoadingAudit(false);
+      }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('access_token');
-    if (!token) {
-      navigate('/');
-      return;
-    }
+    if (!token) return;
 
     if (activeTab === 'drafts') {
         fetchDrafts(currentPage);
-    } else {
+    } else if (activeTab === 'published') {
         fetchPublished();
+    } else if (activeTab === 'audit') {
+        fetchAuditMapsData();
     }
   }, [navigate, activeTab, currentPage]);
 
@@ -128,6 +162,20 @@ export const MyMaps: React.FC = () => {
 
   const handlePlayPublished = (publicId: number) => {
       navigate(`/game?public_id=${publicId}`);
+  };
+
+  const handleSubmitAudit = async (publicMapId: number) => {
+      if (!window.confirm('Submit this map for moderator review?')) return;
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
+      try {
+          await submitToAudit(publicMapId, token);
+          showToast('Submitted for audit successfully!', 'success');
+          fetchPublished(); // Refresh to update status
+      } catch (e) {
+          showToast('Failed to submit for audit', 'error');
+      }
   };
 
   // --- Publish Logic ---
@@ -178,9 +226,8 @@ export const MyMaps: React.FC = () => {
 
           showToast('Map published successfully!', 'success');
           closePublishModal();
-          // Refresh data if in drafts (to show published status change if any)
-          if (activeTab === 'drafts') fetchDrafts(currentPage);
-          // If the user immediately switches to published tab, it will reload there too
+          // Switch to published tab to see the new map
+          setSearchParams({ tab: 'published' });
       } catch (error) {
           console.error('Publish failed', error);
           showToast('Failed to publish map. Please try again.', 'error');
@@ -256,6 +303,21 @@ export const MyMaps: React.FC = () => {
                       <Globe size={18} />
                       Published Maps
                   </button>
+                  
+                  {/* Audit Tab - Only for Auditor (1) or Admin (2) */}
+                  {(userRole === '1' || userRole === '2') && (
+                      <button 
+                        onClick={() => setSearchParams({ tab: 'audit' })}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${
+                            activeTab === 'audit' 
+                            ? 'bg-amber-600 text-white shadow-lg' 
+                            : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                        }`}
+                      >
+                          <ShieldAlert size={18} />
+                          Audit Queue
+                      </button>
+                  )}
               </div>
           </div>
 
@@ -397,9 +459,9 @@ export const MyMaps: React.FC = () => {
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {publishedMaps.map((map) => (
-                                        <div key={map.id} className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-purple-500 hover:shadow-xl transition-all group">
+                                        <div key={map.id} className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-purple-500 hover:shadow-xl transition-all group flex flex-col">
                                             {/* Cover */}
-                                            <div className="relative h-40 bg-gray-750 overflow-hidden">
+                                            <div className="relative h-40 bg-gray-750 overflow-hidden shrink-0">
                                                 {map.cover && map.cover !== '暂无封面' ? (
                                                     <img src={map.cover} alt={map.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                                 ) : (
@@ -408,28 +470,126 @@ export const MyMaps: React.FC = () => {
                                                     </div>
                                                 )}
                                                 {/* Overlay */}
-                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                     <button 
                                                         onClick={() => handlePlayPublished(map.id)}
-                                                        className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 rounded-full font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-all flex items-center gap-2"
+                                                        className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-full font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-all flex items-center gap-2 text-xs"
                                                     >
-                                                        <Gamepad2 size={16} /> Play
+                                                        <Gamepad2 size={14} /> Play
                                                     </button>
                                                 </div>
                                             </div>
+                                            
                                             {/* Info */}
-                                            <div className="p-4">
-                                                <h3 className="font-bold text-white text-lg mb-1 truncate">{map.title}</h3>
-                                                <p className="text-sm text-gray-400 line-clamp-2 min-h-[40px] mb-3">
+                                            <div className="p-4 flex-1 flex flex-col">
+                                                <div className="mb-2">
+                                                     {/* Audit Status Badge */}
+                                                     {map.audit_status === 1 ? (
+                                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold mb-1">
+                                                             <ShieldAlert size={10} /> Pending Audit
+                                                         </span>
+                                                     ) : (
+                                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-gray-700 text-gray-400 border border-gray-600 mb-1">
+                                                             Unverified
+                                                         </span>
+                                                     )}
+                                                     <h3 className="font-bold text-white text-lg truncate">{map.title}</h3>
+                                                </div>
+                                                
+                                                <p className="text-sm text-gray-400 line-clamp-2 min-h-[40px] mb-3 flex-1">
                                                     {map.description || "No description provided."}
                                                 </p>
-                                                <div className="flex justify-between items-center pt-3 border-t border-gray-700 text-[10px] text-gray-500">
-                                                    <div className="flex items-center gap-1">
-                                                        <Calendar size={12} />
-                                                        <span>{new Date(map.create_at).toLocaleDateString()}</span>
+                                                
+                                                <div className="mt-auto">
+                                                    {/* Submit Audit Button */}
+                                                    {(!map.audit_status || map.audit_status === 0) && (
+                                                        <button 
+                                                            onClick={() => handleSubmitAudit(map.id)}
+                                                            className="w-full mb-3 flex items-center justify-center gap-2 bg-amber-600/10 hover:bg-amber-600 text-amber-500 hover:text-white py-1.5 rounded-lg text-xs font-bold transition-all border border-amber-600/30"
+                                                        >
+                                                            <Send size={12} /> Submit for Audit
+                                                        </button>
+                                                    )}
+
+                                                    <div className="flex justify-between items-center pt-3 border-t border-gray-700 text-[10px] text-gray-500">
+                                                        <div className="flex items-center gap-1">
+                                                            <Calendar size={12} />
+                                                            <span>{new Date(map.create_at).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <span className="font-mono bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">ID: {map.id}</span>
                                                     </div>
-                                                    <span className="font-mono bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">ID: {map.id}</span>
                                                 </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                       </div>
+                  </div>
+              )}
+
+              {/* TAB: AUDIT QUEUE */}
+              {activeTab === 'audit' && (
+                  <div className="flex-1 overflow-y-auto p-8">
+                       <div className="max-w-7xl mx-auto">
+                            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-amber-500">
+                                <ShieldAlert size={24} /> Audit Queue
+                            </h2>
+                            {loadingAudit ? (
+                                <div className="flex justify-center mt-20">
+                                    <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                </div>
+                            ) : auditMaps.length === 0 ? (
+                                <div className="text-center text-gray-500 mt-20 bg-gray-800/50 p-10 rounded-xl border border-gray-700 border-dashed">
+                                    <ShieldAlert size={48} className="mx-auto mb-4 opacity-30" />
+                                    <p className="text-lg font-bold">No pending maps</p>
+                                    <p className="text-sm">The queue is clear.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {auditMaps.map((map) => (
+                                        <div key={map.id} className="bg-gray-800 rounded-xl p-4 border border-gray-700 hover:border-amber-500/50 transition-all flex gap-4">
+                                            {/* Cover Thumb */}
+                                            <div className="w-32 h-24 bg-gray-900 rounded-lg overflow-hidden shrink-0">
+                                                {map.cover && map.cover !== "暂无封面" ? (
+                                                    <img src={map.cover} alt={map.title} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-gray-600">
+                                                        <ImageOff size={20} />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-white">{map.title}</h3>
+                                                        <span className="text-xs text-gray-500 font-mono">Public ID: {map.id} | Original Map ID: {map.map_id}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handlePlayPublished(map.id)}
+                                                        className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded text-xs font-bold transition-colors flex items-center gap-1"
+                                                    >
+                                                        <Gamepad2 size={12} /> Preview
+                                                    </button>
+                                                </div>
+                                                <p className="text-sm text-gray-400 line-clamp-2 mb-3 bg-gray-900/50 p-2 rounded">
+                                                    {map.description || "No description."}
+                                                </p>
+                                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                    <Calendar size={12} />
+                                                    Submitted: {new Date(map.create_at).toLocaleString()}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Actions Placeholder - Backend might need Approve/Reject APIs later */}
+                                            <div className="flex flex-col gap-2 justify-center border-l border-gray-700 pl-4">
+                                                <button className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded text-sm font-bold transition-colors">
+                                                    Approve
+                                                </button>
+                                                <button className="px-4 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded text-sm font-bold transition-colors">
+                                                    Reject
+                                                </button>
                                             </div>
                                         </div>
                                     ))}

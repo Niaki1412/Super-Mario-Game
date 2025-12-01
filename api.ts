@@ -59,6 +59,16 @@ export interface PublicMapListItem {
   description: string | null;
   cover: string | null;
   create_at: string;
+  audit_status?: number; // 0: None, 1: Pending
+}
+
+export interface AuditMapListItem {
+  id: number; // public_map_id
+  map_id: number; // original map_id
+  title: string;
+  description: string | null;
+  cover: string | null;
+  create_at: string;
 }
 
 // Response from /api/map/<id>
@@ -276,4 +286,36 @@ export const uploadFile = async (file: File, token: string): Promise<UploadRespo
     }
     const json = await res.json();
     return json.data;
+};
+
+// --- Audit Endpoints ---
+
+export const submitToAudit = async (public_map_id: number, token: string): Promise<void> => {
+    const params = new URLSearchParams();
+    params.append('public_map_id', public_map_id.toString());
+    
+    // Using query param based on prompt "参数：public_map_id". 
+    // If it's a JSON body, we would use body: JSON.stringify({ public_map_id }).
+    // Assuming JSON body for POST usually, but prompt format "参数：public_map_id" is ambiguous. 
+    // However, most other POSTs in this app use JSON body. Let's try query param first as it's a single ID often passed that way in some frameworks, or update if error.
+    // Actually, looking at `deleteMap`, it uses body. Let's use Query Param first as indicated by `public_map_id` listed simply. 
+    // Wait, `deleteMap` prompt was explicit about JSON structure. `submit_to_audit` prompt just said "Parameter: public_map_id".
+    // I will use query string for safety if it's a simple action, or body? Let's use Query params.
+    
+    const res = await fetch(`${API_BASE}/public_map/submit_to_audit?${params.toString()}`, {
+        method: 'POST',
+        headers: getHeaders(token)
+    });
+
+    if (!res.ok) throw new Error('Failed to submit map for audit');
+};
+
+export const getAuditMaps = async (token: string): Promise<AuditMapListItem[]> => {
+    const res = await fetch(`${API_BASE}/audit_public_map_list`, {
+        method: 'GET',
+        headers: getHeaders(token)
+    });
+    if (!res.ok) throw new Error('Failed to fetch audit maps');
+    const json = await res.json();
+    return json.data || [];
 };
