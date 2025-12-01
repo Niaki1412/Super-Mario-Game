@@ -43,14 +43,12 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y, w, h).fill(0x5D4037);
           g.rect(x, y, w, h*0.3).fill(0x4CAF50);
-          // Jagged bottom of grass
           g.moveTo(x, y + h*0.3).lineTo(x + w*0.12, y + h*0.42).lineTo(x + w*0.25, y + h*0.3)
            .lineTo(x + w*0.37, y + h*0.42).lineTo(x + w*0.5, y + h*0.3)
            .lineTo(x + w*0.62, y + h*0.42).lineTo(x + w*0.75, y + h*0.3)
            .lineTo(x + w*0.87, y + h*0.42).lineTo(x + w, y + h*0.3)
            .lineTo(x+w, y).lineTo(x, y).fill(0x4CAF50);
            
-           // Highlight
            g.moveTo(x + w*0.2, y + h*0.15).lineTo(x + w*0.25, y + h*0.05).stroke({width: 1.5, color: 0x81C784});
            g.moveTo(x + w*0.75, y + h*0.18).lineTo(x + w*0.8, y + h*0.08).stroke({width: 1.5, color: 0x81C784});
       }
@@ -64,8 +62,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       attributes: { solid: true, friction: 0.05 }, // Very slippery
       renderSVG: () => <SvgSnow />,
       renderPixi: (g, _l, x, y, w, h) => {
-          g.rect(x, y, w, h).fill(0x90CAF9); // Ice blue bottom
-          g.rect(x, y, w, h*0.4).fill(0xFFFFFF); // Snow top
+          g.rect(x, y, w, h).fill(0x90CAF9);
+          g.rect(x, y, w, h*0.4).fill(0xFFFFFF);
           g.moveTo(x, y + h*0.4).quadraticCurveTo(x + w*0.25, y + h*0.55, x + w*0.5, y + h*0.4)
            .quadraticCurveTo(x + w*0.75, y + h*0.55, x + w, y + h*0.4).lineTo(x+w, y).lineTo(x, y).fill(0xFFFFFF);
           
@@ -83,12 +81,9 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       renderSVG: () => <SvgWater />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y, w, h).fill({color: 0x2196F3, alpha: 0.5});
-          // Wave lines
           const t = Date.now() / 500;
           const offset = Math.sin(t + x) * 2;
           g.moveTo(x, y + h*0.2 + offset).quadraticCurveTo(x + w/2, y + h*0.1 + offset, x + w, y + h*0.2 + offset).stroke({width: 1, color: 0xBBDEFB, alpha: 0.8});
-          
-          // Bubbles
           g.circle(x + w*0.3, y + h*0.5, 2).fill({color: 0xFFFFFF, alpha: 0.3});
           g.circle(x + w*0.7, y + h*0.8, 3).fill({color: 0xFFFFFF, alpha: 0.3});
       }
@@ -105,7 +100,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
           const t = Date.now() / 200;
           const colorShift = Math.sin(t) > 0 ? 0xD32F2F : 0xC62828;
           g.rect(x, y, w, h).fill(colorShift);
-          
           g.circle(x + w*0.25, y + h*0.5, w*0.1).fill(0xFFC107);
           g.circle(x + w*0.75, y + h*0.8, w*0.15).fill(0xFF9800);
           g.circle(x + w*0.5, y + h*0.2, w*0.08).fill(0xFFEB3B);
@@ -222,15 +216,12 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Spring',
       category: 'trigger',
       color: 0xD32F2F,
-      // Fixed: gravity false to prevent falling in editor/game unless meant to be dynamic
-      attributes: { gravity: false, solid: true, bounceForce: -18 },
+      // Fixed: Gravity false so it can be placed in air. Speed 0.
+      attributes: { gravity: false, solid: true, bounceForce: -18, speed: 0 },
       renderSVG: () => <SvgSpring />,
       renderPixi: (g, _l, x, y, w, h, data) => {
-          // Base
           g.rect(x + 4, y + h*0.8, w - 8, h*0.2).fill(0x333333);
-          // Red top
           g.rect(x + 2, y + h*0.2, w - 4, h*0.15).fill(0xD32F2F);
-          // Zigzag spring
           g.moveTo(x + 8, y + h*0.8)
            .lineTo(x + w - 8, y + h*0.8)
            .lineTo(x + w - 12, y + h*0.5)
@@ -251,10 +242,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       renderSVG: () => <SvgBoostPad />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y + h*0.8, w, h*0.2).fill(0x333333);
-          // Green arrows
           g.moveTo(x + w*0.1, y + h*0.8).lineTo(x + w*0.4, y + h*0.8).lineTo(x + w*0.6, y + h*0.5).lineTo(x + w*0.4, y + h*0.5).fill(0x00E676);
           g.moveTo(x + w*0.5, y + h*0.8).lineTo(x + w*0.8, y + h*0.8).lineTo(x + w, y + h*0.5).lineTo(x + w*0.8, y + h*0.5).fill(0x00E676);
-          // Glow
           const t = Date.now() / 100;
           const alpha = (Math.sin(t) + 1) / 2 * 0.5 + 0.2;
           g.moveTo(x + w*0.1, y + h*0.8).lineTo(x + w*0.6, y + h*0.5).stroke({width: 2, color: 0xFFFFFF, alpha});
@@ -266,11 +255,11 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Lightning Trap',
       category: 'enemy',
       color: 0xFFEB3B,
+      // Fixed: Static trap
       attributes: { gravity: false, solid: false, lethal: true, speed: 0 },
       renderSVG: () => <SvgLightning />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.circle(x + w/2, y + h/2, w/2).fill(0x212121);
-          // Bolt
           const t = Date.now() / 50;
           if (Math.floor(t) % 10 < 5) {
               g.moveTo(x + w*0.6, y + h*0.1).lineTo(x + w*0.3, y + h*0.5).lineTo(x + w*0.5, y + h*0.5)
@@ -285,14 +274,12 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Pipe',
       category: 'terrain',
       color: 0x4CAF50,
-      attributes: { gravity: false, solid: true },
+      // Fixed: Static terrain object
+      attributes: { gravity: false, solid: true, speed: 0 },
       renderSVG: () => <SvgPipe />,
       renderPixi: (g, _l, x, y, w, h) => {
-          // Rim
           g.rect(x, y, w, h*0.3).fill(0x4CAF50).stroke({width: 2, color: 0x1B5E20});
-          // Body
           g.rect(x + 2, y + h*0.3, w - 4, h*0.7).fill(0x43A047).stroke({width: 2, color: 0x1B5E20});
-          // Highlights
           g.rect(x + 8, y + 2, 2, h*0.2).fill({color: 0xFFFFFF, alpha: 0.3});
           g.rect(x + 10, y + h*0.3, 4, h*0.7).fill({color: 0x000000, alpha: 0.1});
       }
@@ -303,12 +290,11 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Goomba',
     category: 'enemy',
     color: 0xA0522D,
+    // Dynamic enemy
     attributes: { points: 100, gravity: true, speed: 1 },
     renderSVG: () => <SvgGoomba />,
     renderPixi: (g, _l, x, y, w, h, data) => {
-        // Simple wobble animation
         const wobble = data ? Math.sin(Date.now() / 150) * 2 : 0;
-        
         g.moveTo(x + w*0.2, y + h*0.7)
          .quadraticCurveTo(x + w*0.5, y - h*0.1 + wobble, x + w*0.8, y + h*0.7)
          .lineTo(x + w*0.9, y + h*0.9)
@@ -328,33 +314,23 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Turtle',
     category: 'enemy',
     color: 0x228B22,
+    // Dynamic enemy
     attributes: { points: 200, gravity: true, speed: 1 },
     renderSVG: () => <SvgTurtle />,
     renderPixi: (g, _l, x, y, w, h, data) => {
         const isShell = data?.isShell;
         const vx = data?.vx || 0;
         const isFacingRight = vx > 0;
-        
-        // Helper to flip X coordinate if facing right
         const tx = (localX: number) => isFacingRight ? (x + w - localX) : (x + localX);
 
         if (isShell) {
-             // Shell State
-             g.ellipse(x + w/2, y + h*0.8, w*0.4, h*0.25).fill(0x006400); // Shell
+             g.ellipse(x + w/2, y + h*0.8, w*0.4, h*0.25).fill(0x006400); 
              g.ellipse(x + w/2, y + h*0.8, w*0.3, h*0.15).stroke({ width: 2, color: 0xFFFFFF, alpha: 0.3 });
         } else {
-            // Walking State
-            // Legs (Symmetric enough)
             g.rect(x + w*0.2, y + h*0.75, w*0.15, h*0.25).fill(0x32CD32);
             g.rect(x + w*0.65, y + h*0.75, w*0.15, h*0.25).fill(0x32CD32);
-            
-            // Head (Directional)
-            // Original: x + w*0.25 (Left side)
             g.circle(tx(w*0.25), y + h*0.35, w*0.2).fill(0x32CD32);
-            // Eye
             g.circle(tx(w*0.2), y + h*0.3, 2).fill(0x000000);
-            
-            // Shell Body (Centered)
             g.ellipse(x + w*0.55, y + h*0.6, w*0.35, h*0.25).fill(0x006400);
             g.ellipse(x + w*0.55, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
         }
@@ -366,31 +342,24 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Flying Turtle',
       category: 'enemy',
       color: 0xFF4500,
+      // Flying enemy (Gravity False, but Moving)
       attributes: { points: 300, gravity: false, speed: 2 },
       renderSVG: () => <SvgFlyingTurtle />,
       renderPixi: (g, _l, x, y, w, h, data) => {
-          const vx = data?.vx || -1; // Default to moving left
+          const vx = data?.vx || -1;
           const isFacingRight = vx > 0;
           const tick = Date.now() / 150;
           const wingOffset = Math.sin(tick) * 5;
-
           const tx = (localX: number) => isFacingRight ? (x + w - localX) : (x + localX);
 
-          // Wings (Back)
           g.moveTo(tx(w*0.6), y+h*0.3)
            .quadraticCurveTo(tx(w*0.8), y+h*0.1-wingOffset, tx(w*0.9), y+h*0.2)
            .lineTo(tx(w*0.6), y+h*0.4)
            .fill(0xFFFFFF).stroke({width:1, color: 0xCCCCCC});
-
-          // Body (Red Shell)
           g.ellipse(x + w*0.55, y + h*0.6, w*0.35, h*0.25).fill(0xFF4500);
           g.ellipse(x + w*0.55, y + h*0.6, w*0.25, h*0.15).stroke({ width: 1, color: 0xFFFFFF, alpha: 0.3 });
-
-          // Head
           g.circle(tx(w*0.25), y + h*0.35, w*0.2).fill(0xFFA07A);
           g.circle(tx(w*0.2), y + h*0.3, 2).fill(0x000000);
-
-          // Wings (Front)
           g.moveTo(tx(w*0.5), y+h*0.3)
            .quadraticCurveTo(tx(w*0.7), y+h*0.05-wingOffset, tx(w*0.85), y+h*0.15)
            .lineTo(tx(w*0.5), y+h*0.4)
@@ -403,27 +372,18 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Bouncing Hopper',
       category: 'enemy',
       color: 0x4B0082,
+      // Dynamic jumping enemy
       attributes: { points: 200, gravity: true, speed: 1.5 },
       renderSVG: () => <SvgHopper />,
       renderPixi: (g, _l, x, y, w, h, data) => {
           const compression = data?.grounded ? 0.2 * h : 0;
           const bodyY = y + h*0.4 + compression;
-          
-          // Spring Legs
           g.moveTo(x + w*0.3, y + h).lineTo(x + w*0.2, bodyY).stroke({width: 2, color: 0x555555});
           g.moveTo(x + w*0.7, y + h).lineTo(x + w*0.8, bodyY).stroke({width: 2, color: 0x555555});
-
-          // Body
           g.circle(x + w*0.5, bodyY, w*0.35).fill(0x4B0082);
-          // Eyes
           g.circle(x + w*0.35, bodyY - h*0.05, 3).fill(0xFFFF00);
           g.circle(x + w*0.65, bodyY - h*0.05, 3).fill(0xFFFF00);
-          
-          // Spike on top
-          g.moveTo(x + w*0.5, bodyY - w*0.35)
-           .lineTo(x + w*0.4, bodyY - w*0.5)
-           .lineTo(x + w*0.6, bodyY - w*0.5)
-           .fill(0x999999);
+          g.moveTo(x + w*0.5, bodyY - w*0.35).lineTo(x + w*0.4, bodyY - w*0.5).lineTo(x + w*0.6, bodyY - w*0.5).fill(0x999999);
       }
   },
   {
@@ -432,6 +392,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Fire Dino',
       category: 'enemy',
       color: 0xDC143C,
+      // Dynamic enemy
       attributes: { points: 500, gravity: true, speed: 0.5 },
       renderSVG: () => <SvgFireDino />,
       renderPixi: (g, _l, x, y, w, h, data) => {
@@ -439,27 +400,18 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
           const isFacingRight = vx > 0;
           const tx = (localX: number, width: number = 0) => isFacingRight ? (x + w - localX - width) : (x + localX);
           
-          // Feet
           const tick = Date.now() / 200;
           const step = Math.sin(tick) * 3;
           g.rect(tx(w*0.3 + step, w*0.15), y + h*0.8, w*0.15, h*0.2).fill(0xDC143C);
           g.rect(tx(w*0.55 - step, w*0.15), y + h*0.8, w*0.15, h*0.2).fill(0xDC143C);
-
-          // Body
           g.moveTo(tx(w*0.2), y + h*0.6)
            .lineTo(tx(w*0.4), y + h*0.3)
            .lineTo(tx(w*0.8), y + h*0.4)
            .lineTo(tx(w*0.7), y + h*0.8)
            .lineTo(tx(w*0.3), y + h*0.85)
            .fill(0xDC143C);
-
-          // Mouth
           g.moveTo(tx(w*0.7), y + h*0.4).lineTo(tx(w*0.9), y+h*0.4).lineTo(tx(w*0.8), y+h*0.55).fill(0xFFFF00);
-          
-          // Eye
           g.circle(tx(w*0.6), y + h*0.4, 2).fill(0x000000);
-
-          // Spikes
           g.moveTo(tx(w*0.3), y + h*0.5).lineTo(tx(w*0.2), y+h*0.4).lineTo(tx(w*0.35), y+h*0.4).fill(0xFFFFFF);
           g.moveTo(tx(w*0.4), y + h*0.4).lineTo(tx(w*0.35), y+h*0.25).lineTo(tx(w*0.45), y+h*0.35).fill(0xFFFFFF);
       }
@@ -470,6 +422,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Bob-omb',
       category: 'enemy',
       color: 0x000000,
+      // Dynamic enemy
       attributes: { points: 150, gravity: true, speed: 1.5, lethal: true },
       renderSVG: () => <SvgBomb />,
       renderPixi: (g, _l, x, y, w, h, data) => {
@@ -477,25 +430,15 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
           const tick = Date.now() / 50;
           const flash = isIgnited && Math.floor(tick) % 2 === 0;
           const color = flash ? 0xFF4444 : 0x000000;
-          
-          // Feet
           const walk = Math.sin(Date.now() / 100) * 3;
           g.ellipse(x + w*0.3 + walk, y + h*0.9, w*0.15, h*0.1).fill(0xFFD700);
           g.ellipse(x + w*0.7 - walk, y + h*0.9, w*0.15, h*0.1).fill(0xFFD700);
-
-          // Body
           g.circle(x + w*0.5, y + h*0.55, w*0.35).fill(color);
-          
-          // Shine
           if (!flash) {
              g.circle(x + w*0.65, y + h*0.4, w*0.08).fill({color: 0xFFFFFF, alpha: 0.5});
           }
-
-          // Fuse
           g.rect(x + w*0.45, y + h*0.1, w*0.1, h*0.15).fill(0x888888);
           g.circle(x + w*0.5, y + h*0.1, w*0.05).fill(0xFFA500);
-
-          // Key
           g.moveTo(x + w*0.85, y + h*0.5).lineTo(x + w*0.95, y + h*0.4).lineTo(x + w*0.95, y + h*0.6).fill(0xCCCCCC);
       }
   },
@@ -505,31 +448,19 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Piranha Plant',
     category: 'enemy',
     color: 0x008000,
+    // Fixed: Static enemy (doesn't walk or fall)
     attributes: { points: 150, gravity: false, solid: true, speed: 0 },
     renderSVG: () => <SvgPiranhaPlant />,
     renderPixi: (g, _l, x, y, w, h, data) => {
-        // 1. Draw Plant Head (Behind Pipe if possible, but painter's algorithm says draw first)
-        // In Editor: Draw extended. In Game: Use plantOffset from data.
         const offset = data?.plantOffset ?? -h * 0.8; 
-        
-        // Stem
         g.rect(x + w*0.45, y + offset + h*0.5, w*0.1, h - (offset + h*0.5)).fill(0x32CD32);
-        
-        // Head (Red bulb)
         g.circle(x + w*0.5, y + offset + h*0.3, w*0.25).fill(0xFF0000);
-        // Mouth/Teeth
         g.moveTo(x + w*0.5, y + offset + h*0.3).lineTo(x + w*0.7, y + offset).stroke({width: 2, color: 0xFFFFFF});
         g.moveTo(x + w*0.5, y + offset + h*0.3).lineTo(x + w*0.3, y + offset).stroke({width: 2, color: 0xFFFFFF});
-        // Spots
         g.circle(x + w*0.4, y + offset + h*0.4, 2).fill(0xFFFFFF);
         g.circle(x + w*0.6, y + offset + h*0.2, 2).fill(0xFFFFFF);
-
-        // 2. Draw Pipe (Foreground)
-        // Pipe Rim
         g.rect(x, y, w, h*0.3).fill(0x008000).stroke({ width: 1, color: 0x004d00 });
-        // Pipe Body
         g.rect(x + w*0.05, y + h*0.3, w*0.9, h*0.7).fill(0x006400).stroke({ width: 1, color: 0x003300 });
-        // Highlights
         g.rect(x + w*0.15, y + h*0.35, w*0.1, h*0.6).fill({ color: 0x00FF00, alpha: 0.1 });
     }
   },
@@ -539,20 +470,16 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Pop-up Spike',
       category: 'enemy',
       color: 0x888888,
+      // Fixed: Static Hazard
       attributes: { points: 0, gravity: false, lethal: true, speed: 0 },
       renderSVG: () => <SvgPopUpSpike />,
       renderPixi: (g, _l, x, y, w, h, data) => {
-          // Base
           g.rect(x, y + h*0.8, w, h*0.2).fill(0x555555);
-          
-          let state = data?.spikeState || 'active'; // Default to active in editor
-          
+          let state = data?.spikeState || 'active'; 
           if (state !== 'hidden') {
               const spikeH = state === 'warning' ? h*0.2 : h*0.7;
               const baseY = y + h*0.8;
               const color = 0x999999;
-              
-              // Draw 3 spikes
               for(let i=0; i<3; i++) {
                   const sx = x + (w/3) * i;
                   g.moveTo(sx + 2, baseY)
@@ -569,26 +496,19 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Rotating Spike',
       category: 'enemy',
       color: 0x333333,
+      // Fixed: Static Base
       attributes: { points: 0, gravity: false, lethal: true, speed: 0 },
       renderSVG: () => <SvgRotatingSpike />,
       renderPixi: (g, _l, x, y, w, h, data) => {
-          // Pivot
           const cx = x + w/2;
           const cy = y + h/2;
           g.rect(x + w*0.3, y + h*0.3, w*0.4, h*0.4).fill(0x555555).stroke({width: 1, color: 0x000000});
-          
           const angle = data?.rotationAngle ?? 0;
-          const radius = w * 2.5; // Orbit radius
-          
+          const radius = w * 2.5; 
           const ballX = cx + Math.cos(angle) * radius;
           const ballY = cy + Math.sin(angle) * radius;
-          
-          // Chain
           g.moveTo(cx, cy).lineTo(ballX, ballY).stroke({width: 2, color: 0x777777});
-          
-          // Spike Ball
           g.circle(ballX, ballY, w*0.4).fill(0x333333);
-          // Spikes on ball (simple lines)
           for(let i=0; i<8; i++) {
               const a = i * (Math.PI/4);
               g.moveTo(ballX, ballY).lineTo(ballX + Math.cos(a)*w*0.5, ballY + Math.sin(a)*w*0.5).stroke({width: 2, color: 0x999999});
@@ -614,6 +534,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Mushroom',
     category: 'collectible',
     color: 0xFF4500,
+    // Item runs away
     attributes: { points: 1000, gravity: true, speed: 2, variant: 'grow' },
     renderSVG: () => <SvgMushroom />,
     renderPixi: (g, _l, x, y, w, h) => {
@@ -635,14 +556,15 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Fire Mushroom',
     category: 'collectible',
     color: 0xFF8800,
+    // Item runs away
     attributes: { points: 1000, gravity: true, speed: 2, variant: 'fire' },
     renderSVG: () => <SvgFireMushroom />,
     renderPixi: (g, _l, x, y, w, h) => {
          g.moveTo(x + w*0.1, y + h*0.6)
             .quadraticCurveTo(x + w*0.5, y - h*0.2, x + w*0.9, y + h*0.6)
             .lineTo(x + w*0.1, y + h*0.6)
-            .fill(0xFFD700); // Gold/Orange base
-         g.circle(x + w*0.3, y + h*0.4, 3).fill(0xFF0000); // Red spots
+            .fill(0xFFD700);
+         g.circle(x + w*0.3, y + h*0.4, 3).fill(0xFF0000);
          g.circle(x + w*0.7, y + h*0.4, 3).fill(0xFF0000);
          g.circle(x + w*0.5, y + h*0.2, 4).fill(0xFF0000);
          g.rect(x + w*0.3, y + h*0.6, w*0.4, h*0.3).fill(0xFFE0B2);
@@ -659,22 +581,16 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     attributes: { gravity: false, solid: false },
     renderSVG: () => <SvgCloud />,
     renderPixi: (g, _l, x, y, w, h) => {
-        // Dynamic Animation: Floating
         const time = Date.now() / 1000;
         const offsetY = Math.sin(time * 2) * 3;
-        
-        // Draw Large (2x2 tiles)
         const dw = w * 2;
         const dh = h * 1.5;
         const dy = y + offsetY;
-
         g.circle(x + dw*0.2, dy + dh*0.6, dw*0.2).fill(0xFFFFFF);
         g.circle(x + dw*0.4, dy + dh*0.4, dw*0.25).fill(0xFFFFFF);
         g.circle(x + dw*0.7, dy + dh*0.5, dw*0.22).fill(0xFFFFFF);
         g.circle(x + dw*0.5, dy + dh*0.7, dw*0.2).fill(0xFFFFFF);
         g.circle(x + dw*0.8, dy + dh*0.7, dw*0.15).fill(0xFFFFFF);
-        
-        // Bottom fill
         g.rect(x + dw*0.2, dy + dh*0.6, dw*0.6, dh*0.2).fill(0xFFFFFF);
     }
   },
@@ -682,7 +598,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     id: 999, // Internal
     type: 'object',
     name: 'Bullet',
-    category: 'decoration', // Hidden from palette basically
+    category: 'decoration',
     color: 0xFF4400,
     attributes: { gravity: false, speed: 8 },
     renderSVG: () => <SvgBullet />,
@@ -698,11 +614,9 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     category: 'trigger',
     color: 0x00FF00,
     attributes: { gravity: false },
-    // Use Mario SVG for the player start icon instead of generic 'S'
     renderSVG: () => <SvgMario />,
     renderPixi: (g, _l, x, y, w, h) => {
         g.rect(x + 4, y + 4, w - 8, h - 8).stroke({ width: 2, color: 0x00FF00 });
-        // S for start
         g.moveTo(x + 10, y + 10).lineTo(x+22, y+10).lineTo(x+10, y+22).lineTo(x+22, y+22).stroke({width: 2, color: 0x00FF00});
     }
   },
@@ -715,14 +629,10 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     attributes: { gravity: false, win: true },
     renderSVG: () => <SvgFlagpole />,
     renderPixi: (g, _l, x, y, w, h) => {
-        const poleH = h * 9; // Draw upwards
-        // Base
+        const poleH = h * 9;
         g.rect(x + w*0.2, y + h*0.8, w*0.6, h*0.2).fill(0x8B4513);
-        // Pole
         g.rect(x + w*0.4, y - poleH + h, w*0.2, poleH).fill(0x708090);
-        // Top Ball
         g.circle(x + w*0.5, y - poleH + h, w*0.15).fill(0xFFD700);
-        // Flag (Triangle)
         g.moveTo(x + w*0.6, y - poleH + h + h*0.5)
          .lineTo(x + w*0.6 + w, y - poleH + h + h)
          .lineTo(x + w*0.6, y - poleH + h + h*1.5)
@@ -748,9 +658,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
             t.y = y + h/2;
             labels.addChild(t);
         } else {
-             // Placeholder if no text in data (e.g. palette)
              g.rect(x, y, w, h).stroke({width: 1, color: 0xFFFFFF, alpha: 0.5});
-             if(labels && !data) { // Palette view
+             if(labels && !data) {
                  const t = new PIXI.Text({ text: 'T', style: { fill: 0xFFFFFF, fontSize: 14 }});
                  t.anchor.set(0.5); t.x = x+w/2; t.y = y+h/2;
                  labels.addChild(t);
