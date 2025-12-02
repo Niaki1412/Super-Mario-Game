@@ -206,6 +206,37 @@ export const SvgBomb = () => (
     </>
 );
 
+export const SvgBlooper = () => (
+    <>
+        <path d="M6 10 L16 2 L26 10 L24 22 L16 18 L8 22 Z" fill="#EEE" stroke="#BBB" strokeWidth="1" />
+        <circle cx="12" cy="10" r="2" fill="black" />
+        <circle cx="20" cy="10" r="2" fill="black" />
+        <path d="M10 22 L8 30 M16 18 L16 28 M22 22 L24 30" stroke="#EEE" strokeWidth="3" fill="none" />
+    </>
+);
+
+export const SvgLakitu = () => (
+    <>
+        {/* Cloud */}
+        <path d="M4 22 Q4 16 10 16 Q12 12 16 12 Q20 12 22 16 Q28 16 28 22 Q28 28 22 28 H10 Q4 28 4 22" fill="white" stroke="#DDD" />
+        <circle cx="12" cy="22" r="1" fill="#333" />
+        <circle cx="20" cy="22" r="1" fill="#333" />
+        <path d="M14 24 Q16 26 18 24" stroke="#333" fill="none" />
+        {/* Turtle */}
+        <ellipse cx="16" cy="10" rx="6" ry="5" fill="#FFA500" stroke="green" strokeWidth="1"/>
+        <circle cx="14" cy="8" r="1.5" fill="black" />
+        <rect x="12" y="4" width="8" height="2" fill="green" />
+    </>
+);
+
+export const SvgStar = () => (
+    <>
+        <path d="M16 2 L20 12 L30 12 L22 18 L25 28 L16 22 L7 28 L10 18 L2 12 L12 12 Z" fill="#FFD700" stroke="#FFA000" strokeWidth="1" />
+        <line x1="14" y1="10" x2="14" y2="14" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="18" y1="10" x2="18" y2="14" stroke="black" strokeWidth="1.5" strokeLinecap="round"/>
+    </>
+);
+
 export const SvgPiranhaPlant = () => (
     <>
         <rect x="6" y="16" width="20" height="16" fill="#006400" />

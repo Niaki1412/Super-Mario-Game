@@ -35,6 +35,7 @@ export interface ElementConfig {
     gravity?: boolean;
     speed?: number;
     win?: boolean;
+    hp?: number; // Health points for enemies
     // New Attributes
     friction?: number; // 0.0 to 1.0 (Lower is slippery)
     liquidType?: 'water' | 'lava';
@@ -92,6 +93,10 @@ export interface Entity extends Rect {
   isEffect?: boolean;
   isBullet?: boolean;
   
+  // Health
+  hp?: number;
+  maxHp?: number;
+
   // Player specific
   isBig?: boolean;
   canShoot?: boolean;
@@ -104,6 +109,10 @@ export interface Entity extends Rect {
   isHovering?: boolean; // For Stella
   hoverTimer?: number;
   spikeImmunity?: boolean; // For Iron
+  
+  // Star Power & Debuffs
+  starTimer?: number; // Invincibility + Kill on touch
+  inkBlindnessTimer?: number; // Screen darkened
   
   // Enemy specific
   patrolCenter?: number;
@@ -124,6 +133,11 @@ export interface Entity extends Rect {
   shootTimer?: number; // For Fire Dino
   bombState?: 'walking' | 'ignited'; // For Bomb
   bombTimer?: number; // For Bomb explosion
+  
+  // Blooper & Lakitu
+  blooperState?: 'idle' | 'move' | 'squirt';
+  blooperTimer?: number;
+  lakituTimer?: number;
 
   // Physics specific
   hasGravity?: boolean;
@@ -139,7 +153,7 @@ export interface Entity extends Rect {
   scale?: number;
   
   // Bullet variant
-  bulletVariant?: 'fireball' | 'banana' | 'shuriken' | 'magic' | 'cannon';
+  bulletVariant?: 'fireball' | 'banana' | 'shuriken' | 'magic' | 'cannon' | 'ink';
 
   // Warp & Victory
   warpState?: 'idle' | 'entering' | 'exiting';

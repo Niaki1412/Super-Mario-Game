@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle, Rect } from '../../types';
@@ -140,6 +141,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             const labels = new PIXI.Container();
             labels.label = 'game-labels';
             app.stage.addChild(labels);
+            
+            // Ink Overlay Layer (Top)
+            const inkLayer = new PIXI.Graphics();
+            inkLayer.label = 'ink-overlay';
+            app.stage.addChild(inkLayer);
 
             // Reset State
             mapRef.current = mapData;
@@ -187,7 +193,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 hasGravity: true, invincibleTimer: 0, shootCooldown: 0,
                 jumpCount: 0, isCrouching: false,
                 spikeImmunity: charConfig.physics.spikeImmunity || false,
-                warpState: 'idle'
+                warpState: 'idle',
+                starTimer: 0, inkBlindnessTimer: 0
             });
 
             mapData.objects.forEach(obj => {
@@ -219,7 +226,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     type: obj.type,
                     x: obj.x, y: y,
                     w: tileSize, h: h,
-                    vx: config.category === 'enemy' ? -(config.attributes?.speed ?? 1) * scaleRatio : 0,
+                    vx: config.category === 'enemy' && config.name !== 'Lakitu' ? -(config.attributes?.speed ?? 1) * scaleRatio : 0,
                     vy: 0,
                     isDead: false, grounded: false,
                     isEnemy: config.category === 'enemy',
@@ -228,10 +235,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     hasGravity: config.attributes?.gravity ?? true,
                     text: obj.text,
                     isShell: false,
+                    hp: config.attributes?.hp || 1,
+                    maxHp: config.attributes?.hp || 1,
+                    
+                    // State specific
                     plantState: 'hidden', plantTimer: 0, plantOffset: 0,
                     spikeState: 'hidden', spikeTimer: 0, rotationAngle: 0,
                     jumpTimer: 0, shootTimer: 0,
                     bombState: 'walking', bombTimer: 0,
+                    blooperState: 'idle', blooperTimer: 0,
+                    lakituTimer: 0,
                     flagProgress: 0
                 });
             });
@@ -332,6 +345,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
     };
 
+    const damageEnemy = (enemy: ExtendedEntity, damage: number = 1) => {
+        enemy.hp = (enemy.hp || 1) - damage;
+        if (enemy.hp <= 0) {
+            enemy.isDead = true;
+            addScore(100);
+            spawnParticles(enemy.x, enemy.y, 0xFF4400);
+            audioManager.playStomp();
+        } else {
+            // Flash effect or pushback could go here
+            audioManager.playBump();
+            enemy.vx = -enemy.vx; // Pushback
+            spawnParticles(enemy.x, enemy.y, 0xFFFFFF);
+        }
+    };
+
     const spawnBullet = (source: Entity, isPlayerBullet: boolean) => {
         const tileSize = mapRef.current.tileSize;
         const scaleRatio = tileSize / 32;
@@ -413,7 +441,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             const dist = Math.sqrt(dx*dx + dy*dy);
             if (dist < radius) {
                 if (e.isPlayer) takeDamage(e);
-                else { e.isDead = true; addScore(100); spawnParticles(e.x, e.y, 0x555555); }
+                else { 
+                    damageEnemy(e, 10);
+                }
             }
         });
 
@@ -489,6 +519,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                          if (!entity.isEnemy && entity.isBullet && entity.bulletVariant !== 'banana' && entity.bulletVariant !== 'magic') { 
                              entity.isDead = true; spawnParticles(entity.x + entity.w, entity.y, 0xFFD700); 
                          }
+                         // Star bounces
+                         if (entity.type === 'Power Star') entity.vx = -entity.vx;
                          return;
                      }
                 }
@@ -509,6 +541,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                          if (!entity.isEnemy && entity.isBullet && entity.bulletVariant !== 'banana' && entity.bulletVariant !== 'magic') { 
                             entity.isDead = true; spawnParticles(entity.x, entity.y, 0xFFD700); 
                          }
+                        // Star bounces
+                        if (entity.type === 'Power Star') entity.vx = -entity.vx;
                         return;
                     }
                 }
@@ -524,7 +558,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                         entity.vy = 0;
                         entity.grounded = true;
                         
-                        if (isLethalTile(tileId) && !entity.spikeImmunity) {
+                        if (isLethalTile(tileId) && !entity.spikeImmunity && !entity.invincibleTimer) {
                             if (entity.isPlayer) takeDamage(entity);
                             else if (!entity.isBullet) entity.isDead = true; 
                         }
@@ -536,9 +570,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                                 entity.isDead = true; spawnParticles(entity.x, entity.y + entity.h, 0xFFD700); 
                             }
                         }
+                        // Star bounces high
+                        if (entity.type === 'Power Star') {
+                            entity.vy = -8 * (tileSize/32);
+                        }
                         return;
                     }
-                    if (isLethalTile(tileId) && !entity.spikeImmunity) {
+                    if (isLethalTile(tileId) && !entity.spikeImmunity && !entity.invincibleTimer) {
                         if (entity.isPlayer) takeDamage(entity);
                         else if (!entity.isBullet) entity.isDead = true;
                     }
@@ -563,6 +601,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                                 addScore(100);
                                 audioManager.playCoin();
                                 spawnVisualEffect(x * tileSize, (top-1) * tileSize, 'coin_pop');
+                                
+                                // Rare chance to spawn Star
+                                if (Math.random() < 0.1) {
+                                     entitiesRef.current.push({
+                                        id: `star-${Math.random()}`,
+                                        type: 'Power Star',
+                                        x: x * tileSize, y: (top-1) * tileSize,
+                                        w: tileSize, h: tileSize,
+                                        vx: 2, vy: -5,
+                                        isDead: false, grounded: false,
+                                        isCollectible: true, hasGravity: true
+                                     } as ExtendedEntity);
+                                }
                             } else {
                                 audioManager.playBump();
                             }
@@ -627,6 +678,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const scaleRatio = tileSize / 32;
         
         const phys = COMMON_PHYSICS;
+        const player = entitiesRef.current.find(e => e.isPlayer);
 
         entitiesRef.current = entities.filter(e => {
             if (e.type === 'VisualEffect') {
@@ -680,6 +732,67 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 entity.plantTimer = (entity.plantTimer || 0) + 0.03 * delta;
                 const maxOffset = entity.h * 0.8;
                 entity.plantOffset = -Math.abs(Math.sin(entity.plantTimer) * maxOffset);
+            } else if (entity.type === 'Blooper' && player) {
+                // Blooper AI
+                const distX = player.x - entity.x;
+                const distY = player.y - entity.y;
+                const dist = Math.sqrt(distX*distX + distY*distY);
+                entity.blooperTimer = (entity.blooperTimer || 0) + delta;
+
+                // Move in bursts
+                if (entity.blooperState === 'idle') {
+                    entity.vx *= 0.95;
+                    entity.vy *= 0.95;
+                    if (entity.blooperTimer > 60 && dist < 300) {
+                        entity.blooperState = 'move';
+                        entity.blooperTimer = 0;
+                        entity.vx = Math.sign(distX) * 2 * scaleRatio;
+                        entity.vy = Math.sign(distY) * 2 * scaleRatio;
+                    }
+                } else if (entity.blooperState === 'move') {
+                    if (entity.blooperTimer > 40) {
+                        entity.blooperState = 'idle';
+                        entity.blooperTimer = 0;
+                        
+                        // Chance to squirt ink if close
+                        if (Math.random() < 0.3 && dist < 150) {
+                            // Shoot ink projectile towards player
+                            entitiesRef.current.push({
+                                id: `ink-${Math.random()}`,
+                                type: 'Bullet',
+                                x: entity.x + entity.w/2, y: entity.y + entity.h/2,
+                                w: 10, h: 10,
+                                vx: Math.sign(distX) * 4, vy: Math.sign(distY) * 4,
+                                isDead: false, grounded: false, isBullet: true,
+                                isEnemy: true, bulletVariant: 'ink', hasGravity: false
+                            } as ExtendedEntity);
+                        }
+                    }
+                }
+            } else if (entity.type === 'Lakitu' && player) {
+                // Lakitu AI: Hover above player X, maintain Y
+                const targetX = player.x;
+                const speed = 2 * scaleRatio;
+                
+                if (entity.x < targetX - 50) entity.vx = speed;
+                else if (entity.x > targetX + 50) entity.vx = -speed;
+                else entity.vx *= 0.9; // Slow down when near
+
+                // Throw projectile
+                entity.lakituTimer = (entity.lakituTimer || 0) + delta;
+                if (entity.lakituTimer > 180) { // Every 3 seconds
+                    entity.lakituTimer = 0;
+                    // Spawn Shell dropping
+                    entitiesRef.current.push({
+                        id: `spiny-${Math.random()}`,
+                        type: 'Turtle',
+                        x: entity.x + entity.w/2, y: entity.y + entity.h,
+                        w: tileSize, h: tileSize,
+                        vx: 0, vy: 0,
+                        isDead: false, grounded: false, isEnemy: true,
+                        isShell: true, hasGravity: true, hp: 1
+                    } as ExtendedEntity);
+                }
             } else if (entity.type === 'Flagpole') {
                  // Animation update handled in render or interaction
             }
@@ -761,7 +874,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 if (entity.bulletVariant === 'banana') {
                     handleTileCollision(entity, map, 'y');
                     handleTileCollision(entity, map, 'x');
-                } else if (entity.bulletVariant !== 'shuriken' && entity.bulletVariant !== 'magic') {
+                } else if (entity.bulletVariant !== 'shuriken' && entity.bulletVariant !== 'magic' && entity.bulletVariant !== 'ink') {
                     const tile = getTileAt(entity.x + entity.w/2, entity.y + entity.h/2, map);
                     if (isSolid(tile)) {
                         entity.isDead = true;
@@ -779,12 +892,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     if (checkRectCollision(entity, other)) {
                         entity.isDead = true;
                         if (other.isPlayer) {
-                            takeDamage(other);
+                            if (entity.bulletVariant === 'ink') {
+                                other.inkBlindnessTimer = 300; // 5 seconds blindness
+                                audioManager.playBump();
+                            } else {
+                                takeDamage(other);
+                            }
                         } else {
-                            other.isDead = true;
-                            addScore(100);
-                            spawnParticles(other.x, other.y, 0xFF4400);
-                            audioManager.playStomp();
+                            damageEnemy(other as ExtendedEntity, 10); // Bullets deal high damage
                         }
                     }
                 });
@@ -795,6 +910,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 const moveSpeed = phys.runSpeed * charConfig.physics.moveSpeedMult * scaleRatio;
                 const accel = phys.acceleration * charConfig.physics.moveSpeedMult;
 
+                // Speed boost if Star power active
+                const speedMod = entity.starTimer && entity.starTimer > 0 ? 1.5 : 1.0;
+
                 const effectiveFriction = entity.grounded && entity.frictionMultiplier 
                     ? phys.friction * entity.frictionMultiplier 
                     : phys.friction;
@@ -804,9 +922,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     : accel;
 
                 if (keys[controls.left]) {
-                    entity.vx -= effectiveAccel * scaleRatio * delta;
+                    entity.vx -= effectiveAccel * scaleRatio * delta * speedMod;
                 } else if (keys[controls.right]) {
-                    entity.vx += effectiveAccel * scaleRatio * delta;
+                    entity.vx += effectiveAccel * scaleRatio * delta * speedMod;
                 } else {
                     entity.vx *= effectiveFriction;
                 }
@@ -887,16 +1005,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     }
                 }
                 if (entity.shootCooldown && entity.shootCooldown > 0) entity.shootCooldown -= delta;
-                if (entity.invincibleTimer && entity.invincibleTimer > 0) {
-                    entity.invincibleTimer -= delta; 
-                    if (entity.invincibleTimer < 0) entity.invincibleTimer = 0;
-                }
+                
+                // Timer updates
+                if (entity.invincibleTimer && entity.invincibleTimer > 0) entity.invincibleTimer -= delta;
+                if (entity.starTimer && entity.starTimer > 0) entity.starTimer -= delta;
+                if (entity.inkBlindnessTimer && entity.inkBlindnessTimer > 0) entity.inkBlindnessTimer -= delta;
 
-                if (Math.abs(entity.vx) > moveSpeed * 3) entity.vx *= 0.95;
-                else if (Math.abs(entity.vx) > moveSpeed && !keys[controls.left] && !keys[controls.right]) {}
+                const maxSpeed = moveSpeed * speedMod;
+                if (Math.abs(entity.vx) > maxSpeed * 3) entity.vx *= 0.95;
+                else if (Math.abs(entity.vx) > maxSpeed && !keys[controls.left] && !keys[controls.right]) {}
                 else {
-                    if (entity.vx > moveSpeed) entity.vx = moveSpeed;
-                    if (entity.vx < -moveSpeed) entity.vx = -moveSpeed;
+                    if (entity.vx > maxSpeed) entity.vx = maxSpeed;
+                    if (entity.vx < -maxSpeed) entity.vx = -maxSpeed;
                 }
 
                 if (entity.y > map.height * tileSize) die();
@@ -945,6 +1065,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                          }
 
                          if (other.isEnemy) {
+                             // Star Power kills instantly
+                             if (entity.starTimer && entity.starTimer > 0) {
+                                 other.isDead = true;
+                                 spawnParticles(other.x, other.y, 0xFFFFFF);
+                                 addScore(200);
+                                 audioManager.playStomp();
+                                 return;
+                             }
+
                              if(entity.spikeImmunity && (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike')) return;
                              if (other.type === 'Pop-up Spike' && other.spikeState !== 'active') return;
                              
@@ -952,7 +1081,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                              const unStompable = ['Piranha Plant', 'Pop-up Spike', 'Rotating Spike', 'Lightning Trap', 'Boost Pad'].includes(other.type);
 
                              if(isStomp && !unStompable) {
-                                 other.isDead = true; 
+                                 damageEnemy(other as ExtendedEntity, 1);
                                  entity.vy = phys.bounceForce * scaleRatio;
                                  audioManager.playStomp();
                              } else {
@@ -965,8 +1094,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                                 const originalH = HITBOXES.big.height * scaleRatio;
                                 entity.y -= (originalH - entity.h);
                                 entity.h = originalH;
-                            }
-                            if(config?.attributes?.variant === 'fire') { 
+                            } else if(config?.attributes?.variant === 'fire') { 
                                 entity.isBig = true; 
                                 entity.canShoot = true; 
                                 const originalH = HITBOXES.big.height * scaleRatio;
@@ -974,6 +1102,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                                     entity.y -= (originalH - entity.h);
                                     entity.h = originalH;
                                 }
+                            } else if(config?.attributes?.variant === 'star') {
+                                entity.starTimer = 600; // 10 seconds (approx 60fps)
+                                entity.invincibleTimer = 600;
+                                audioManager.playPowerup(); // Should be star theme ideally
                             }
                             audioManager.playCoin();
                          } else if (other.type === 'Boost Pad') {
@@ -997,13 +1129,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         
         // Blink if invincible
         if (e.invincibleTimer && Math.floor(e.invincibleTimer / 4) % 2 === 0) return;
+        
+        // Rainbow effect for Star power
+        let primaryColor = colors.primary;
+        if (e.starTimer && e.starTimer > 0) {
+            const tick = Date.now() / 50;
+            const rainbow = [0xFF0000, 0xFFA500, 0xFFFF00, 0x008000, 0x0000FF, 0x4B0082, 0xEE82EE];
+            primaryColor = rainbow[Math.floor(tick) % rainbow.length];
+        }
+
         if (e.warpState === 'entering' || e.warpState === 'exiting') {
             g.alpha = 0.5; // Fade during warp
         } else {
             g.alpha = 1;
         }
 
-        g.rect(tx(w*0.2, w*0.6), y + h*0.4, w*0.6, h*0.4).fill(colors.primary);
+        g.rect(tx(w*0.2, w*0.6), y + h*0.4, w*0.6, h*0.4).fill(primaryColor);
         g.circle(tx(w*0.5, 0), y + h*0.25, w*0.35).fill(colors.secondary);
         const eyeOffset = isBackwards ? -w*0.1 : w*0.1;
         g.circle(tx(w*0.5 + eyeOffset + w*0.15, 0), y + h*0.25, 2).fill(0x000000);
@@ -1022,11 +1163,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const g = app.stage.getChildByLabel('game-graphics') as PIXI.Graphics;
         const labels = app.stage.getChildByLabel('game-labels') as PIXI.Container;
         const customImgLayer = app.stage.getChildByLabel('game-custom-images') as PIXI.Container;
+        const inkLayer = app.stage.getChildByLabel('ink-overlay') as PIXI.Graphics;
         
-        if (!g || !labels || !customImgLayer) return;
+        if (!g || !labels || !customImgLayer || !inkLayer) return;
         const tileSize = mapRef.current.tileSize;
 
         g.clear();
+        inkLayer.clear();
         labels.removeChildren().forEach(c => c.destroy({ texture: true }));
         customImgLayer.removeChildren().forEach(c => c.destroy());
 
@@ -1034,8 +1177,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const player = entitiesRef.current.find(e => e.isPlayer);
         if (player) {
             cameraX = Math.max(0, player.x - (width || window.innerWidth) / 2);
+            
+            // Draw Ink Overlay if blinded
+            if (player.inkBlindnessTimer && player.inkBlindnessTimer > 0) {
+                 inkLayer.rect(0, 0, width || window.innerWidth, height || window.innerHeight)
+                         .fill({ color: 0x000000, alpha: 0.95 });
+                 // Create a small "hole" around player or just full black
+                 inkLayer.circle((width||window.innerWidth)/2, (height||window.innerHeight)/2, 50).cut();
+            }
         }
         app.stage.position.x = -cameraX;
+        // Fix ink layer to be static on screen (not moving with camera)
+        inkLayer.position.x = cameraX;
 
         const viewW = width || window.innerWidth;
         const startCol = Math.floor(cameraX / tileSize);
@@ -1078,8 +1231,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 if (config && config.name !== 'Invisible Death Block') {
                    config.renderPixi(g, labels, e.x, e.y, e.w, e.h, e);
                 } else if (e.isBullet) {
-                     g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
-                     g.circle(e.x + e.w/2, e.y + e.h/2, e.w/4).fill(0xFFFF00);
+                     if (e.bulletVariant === 'ink') {
+                         g.circle(e.x + e.w/2, e.y + e.h/2, e.w).fill(0x000000);
+                     } else {
+                         g.circle(e.x + e.w/2, e.y + e.h/2, e.w/2).fill(0xFF4400);
+                         g.circle(e.x + e.w/2, e.y + e.h/2, e.w/4).fill(0xFFFF00);
+                     }
                 }
             }
         });

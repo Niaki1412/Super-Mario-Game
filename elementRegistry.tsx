@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import * as PIXI from 'pixi.js';
 import { ElementConfig } from './types';
@@ -8,7 +9,8 @@ import {
     SvgGoomba, SvgTurtle, SvgPiranhaPlant, SvgPopUpSpike, SvgRotatingSpike,
     SvgCoin, SvgMushroom, SvgFireMushroom, SvgCloud, SvgBullet, SvgPlayerStart, SvgFlagpole, SvgTextDecoration,
     SvgMario, SvgFlyingTurtle, SvgHopper, SvgFireDino, SvgBomb,
-    SvgGrass, SvgSnow, SvgWater, SvgLava, SvgSpring, SvgBoostPad, SvgLightning, SvgPipe
+    SvgGrass, SvgSnow, SvgWater, SvgLava, SvgSpring, SvgBoostPad, SvgLightning, SvgPipe,
+    SvgBlooper, SvgStar, SvgLakitu
 } from './elementSVGs';
 
 export interface RegistryItem extends ElementConfig {
@@ -446,6 +448,83 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
           g.circle(x + w*0.5, y + h*0.1, w*0.05).fill(0xFFA500);
           g.moveTo(x + w*0.85, y + h*0.5).lineTo(x + w*0.95, y + h*0.4).lineTo(x + w*0.95, y + h*0.6).fill(0xCCCCCC);
       }
+  },
+  {
+    id: 116,
+    type: 'object',
+    name: 'Blooper',
+    category: 'enemy',
+    color: 0xEEEEEE,
+    attributes: { points: 400, gravity: false, speed: 1.5, lethal: true, hp: 2, liquidType: 'water' },
+    renderSVG: () => <SvgBlooper />,
+    renderPixi: (g, _l, x, y, w, h, data) => {
+        const squash = data?.blooperState === 'move' ? 0.8 : 1;
+        const cy = y + h * 0.5;
+        
+        g.moveTo(x + w*0.2, cy - h*0.4 * squash)
+         .lineTo(x + w*0.8, cy - h*0.4 * squash)
+         .lineTo(x + w*0.9, cy + h*0.2)
+         .lineTo(x + w*0.1, cy + h*0.2)
+         .fill(0xEEEEEE);
+         
+         // Tentacles
+         g.moveTo(x + w*0.2, cy + h*0.2).lineTo(x + w*0.15, cy + h*0.5).stroke({width: 3, color: 0xEEEEEE});
+         g.moveTo(x + w*0.4, cy + h*0.2).lineTo(x + w*0.4, cy + h*0.5).stroke({width: 3, color: 0xEEEEEE});
+         g.moveTo(x + w*0.6, cy + h*0.2).lineTo(x + w*0.6, cy + h*0.5).stroke({width: 3, color: 0xEEEEEE});
+         g.moveTo(x + w*0.8, cy + h*0.2).lineTo(x + w*0.85, cy + h*0.5).stroke({width: 3, color: 0xEEEEEE});
+
+         // Mask
+         g.rect(x + w*0.2, cy - h*0.1, w*0.6, h*0.15).fill(0x333333);
+         g.circle(x + w*0.35, cy, 2).fill(0xFFFFFF);
+         g.circle(x + w*0.65, cy, 2).fill(0xFFFFFF);
+    }
+  },
+  {
+    id: 117,
+    type: 'object',
+    name: 'Lakitu',
+    category: 'enemy',
+    color: 0xFFFFFF,
+    attributes: { points: 800, gravity: false, speed: 2, lethal: true, hp: 3 },
+    renderSVG: () => <SvgLakitu />,
+    renderPixi: (g, _l, x, y, w, h, data) => {
+        // Cloud
+        g.ellipse(x + w*0.5, y + h*0.7, w*0.45, h*0.25).fill(0xFFFFFF).stroke({width: 1, color: 0xCCCCCC});
+        g.circle(x + w*0.3, y + h*0.75, w*0.15).fill(0xFFFFFF);
+        g.circle(x + w*0.7, y + h*0.75, w*0.15).fill(0xFFFFFF);
+        g.circle(x + w*0.35, y + h*0.75, 1.5).fill(0x333333);
+        g.circle(x + w*0.65, y + h*0.75, 1.5).fill(0x333333);
+        g.moveTo(x + w*0.45, y + h*0.8).quadraticCurveTo(x + w*0.5, y + h*0.85, x + w*0.55, y + h*0.8).stroke({width: 1, color: 0x333333});
+
+        // Turtle
+        g.ellipse(x + w*0.5, y + h*0.4, w*0.2, h*0.15).fill(0xFFA500).stroke({width: 1, color: 0x008000});
+        g.circle(x + w*0.45, y + h*0.35, 1.5).fill(0x000000);
+        g.rect(x + w*0.4, y + h*0.2, w*0.2, h*0.05).fill(0x008000);
+    }
+  },
+  {
+    id: 118,
+    type: 'object',
+    name: 'Power Star',
+    category: 'collectible',
+    color: 0xFFD700,
+    attributes: { points: 1000, gravity: true, speed: 2, destructible: false, variant: 'star' },
+    renderSVG: () => <SvgStar />,
+    renderPixi: (g, _l, x, y, w, h) => {
+        const tick = Date.now() / 100;
+        const color = Math.floor(tick) % 2 === 0 ? 0xFFD700 : 0xFFFFFF; // Flash
+        
+        g.moveTo(x + w*0.5, y).lineTo(x + w*0.65, y + h*0.35).lineTo(x + w, y + h*0.35)
+         .lineTo(x + w*0.75, y + h*0.6).lineTo(x + w*0.85, y + h)
+         .lineTo(x + w*0.5, y + h*0.8).lineTo(x + w*0.15, y + h)
+         .lineTo(x + w*0.25, y + h*0.6).lineTo(x, y + h*0.35)
+         .lineTo(x + w*0.35, y + h*0.35).lineTo(x + w*0.5, y)
+         .fill(color).stroke({width: 1, color: 0xB8860B});
+        
+        g.lineStyle(1.5, 0x000000);
+        g.moveTo(x + w*0.4, y + h*0.35).lineTo(x + w*0.4, y + h*0.55);
+        g.moveTo(x + w*0.6, y + h*0.35).lineTo(x + w*0.6, y + h*0.55);
+    }
   },
   {
     id: 107,
