@@ -140,6 +140,12 @@ export interface Entity extends Rect {
   
   // Bullet variant
   bulletVariant?: 'fireball' | 'banana' | 'shuriken' | 'magic' | 'cannon';
+
+  // Warp & Victory
+  warpState?: 'idle' | 'entering' | 'exiting';
+  warpTarget?: string; // ID of target pipe
+  warpTimer?: number;
+  flagProgress?: number; // 0 (top) to 1 (bottom)
 }
 
 export interface Particle {

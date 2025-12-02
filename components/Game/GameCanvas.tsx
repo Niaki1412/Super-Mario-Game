@@ -187,7 +187,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 isPlayer: true, isBig: false, canShoot: false,
                 hasGravity: true, invincibleTimer: 0, shootCooldown: 0,
                 jumpCount: 0, isCrouching: false,
-                spikeImmunity: charConfig.physics.spikeImmunity || false
+                spikeImmunity: charConfig.physics.spikeImmunity || false,
+                warpState: 'idle'
             });
 
             mapData.objects.forEach(obj => {
@@ -231,7 +232,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     plantState: 'hidden', plantTimer: 0, plantOffset: 0,
                     spikeState: 'hidden', spikeTimer: 0, rotationAngle: 0,
                     jumpTimer: 0, shootTimer: 0,
-                    bombState: 'walking', bombTimer: 0
+                    bombState: 'walking', bombTimer: 0,
+                    flagProgress: 0
                 });
             });
 
@@ -239,7 +241,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
             // Game Loop
             app.ticker.add((ticker) => {
-                if (isGameOverRef.current || isWonRef.current || !mapRef.current) return;
+                // Keep rendering during victory, but might stop physics or change state
+                if (isGameOverRef.current || !mapRef.current) return;
                 
                 const rawDelta = ticker.deltaTime;
                 const safeDelta = Math.min(rawDelta, GAME_SETTINGS.maxDelta);
@@ -434,6 +437,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
     };
 
+    // --- Collision Logic ---
     const handleTileCollision = (entity: ExtendedEntity, map: GameMap, axis: 'x' | 'y') => {
         const tileSize = map.tileSize;
         const left = Math.floor(entity.x / tileSize);
@@ -446,6 +450,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             entity.frictionMultiplier = 1;
         }
 
+        // 1. Grid based collision
         for (let y = top; y <= bottom; y++) {
             for (let x = left; x <= right; x++) {
                 if (y < 0 || y >= map.height || x < 0 || x >= map.width) continue;
@@ -466,6 +471,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             }
         }
 
+        // 2. Resolve Solid Grid Walls
         if (axis === 'x') {
             if (entity.vx > 0) {
                 if (right >= map.width) { 
@@ -570,6 +576,47 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 }
             }
         }
+
+        // 3. Resolve Solid Object Walls (Pipes, Springs, etc.)
+        // Only if not bullet or effect
+        if (entity.isBullet || entity.isEffect || entity.type === 'VisualEffect') return;
+        
+        entitiesRef.current.forEach(other => {
+            if (other === entity || other.type === 'CustomImage') return;
+            const config = getElementByName(other.type);
+            // Check if object is solid
+            if (config?.attributes?.solid) {
+                if (checkRectCollision(entity, other)) {
+                    // Resolve simple push out
+                    const overlapX = (entity.w + other.w) / 2 - Math.abs((entity.x + entity.w/2) - (other.x + other.w/2));
+                    const overlapY = (entity.h + other.h) / 2 - Math.abs((entity.y + entity.h/2) - (other.y + other.h/2));
+
+                    if (overlapX > 0 && overlapY > 0) {
+                        // Resolve along shallowest axis
+                        if (overlapX < overlapY) {
+                            // X resolution
+                            if (axis === 'x') {
+                                if (entity.x < other.x) entity.x -= overlapX;
+                                else entity.x += overlapX;
+                                entity.vx = 0;
+                                if (entity.isEnemy) entity.vx = -entity.vx; 
+                            }
+                        } else {
+                            // Y resolution
+                            if (axis === 'y') {
+                                if (entity.y < other.y) {
+                                    entity.y -= overlapY;
+                                    entity.grounded = true;
+                                } else {
+                                    entity.y += overlapY;
+                                }
+                                entity.vy = 0;
+                            }
+                        }
+                    }
+                }
+            }
+        });
     };
 
     const updatePhysics = (delta: number) => {
@@ -579,7 +626,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const prevKeys = prevKeysRef.current;
         const tileSize = map.tileSize;
         const scaleRatio = tileSize / 32;
-        const currentTime = Date.now();
         
         const phys = COMMON_PHYSICS;
 
@@ -618,7 +664,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             if (entity.type === 'Pop-up Spike') {
                 entity.spikeTimer = (entity.spikeTimer || 0) + delta;
                 if (!entity.spikeState) entity.spikeState = 'active';
-                
                 // Cycle: Hidden (2s) -> Warning (1s) -> Active (2s)
                 if (entity.spikeState === 'hidden' && entity.spikeTimer > 120) {
                     entity.spikeState = 'warning';
@@ -634,12 +679,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 entity.rotationAngle = (entity.rotationAngle || 0) + 0.05 * delta;
             } else if (entity.type === 'Piranha Plant') {
                 entity.plantTimer = (entity.plantTimer || 0) + 0.03 * delta;
-                // Move up and down smoothly
                 const maxOffset = entity.h * 0.8;
                 entity.plantOffset = -Math.abs(Math.sin(entity.plantTimer) * maxOffset);
+            } else if (entity.type === 'Flagpole') {
+                 // Animation update handled in render or interaction
             }
 
-            // -- Gravity & Hover Physics --
+            // -- Gravity & Physics --
             if (entity.hasGravity) {
                 let effectiveGravity = phys.gravity * scaleRatio;
                 let effectiveTerminal = phys.terminalVelocity * scaleRatio;
@@ -661,16 +707,63 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 if (entity.vy > effectiveTerminal) entity.vy = effectiveTerminal;
             }
 
+            // --- Player WARP Logic ---
+            if (entity.isPlayer) {
+                if (entity.warpState === 'entering') {
+                    entity.y += 1 * scaleRatio * delta; // Slide down
+                    entity.warpTimer = (entity.warpTimer || 0) + delta;
+                    if (entity.warpTimer > 60) {
+                        // Find target
+                        const pipes = entitiesRef.current.filter(e => e.type === 'Pipe');
+                        // Find nearest pipe that isn't the current one? Or just random other pipe?
+                        // Simple heuristic: Find pipe with index > current index, wrap around
+                        // To do this reliably, we need to know WHICH pipe we are standing on.
+                        // We set warpTarget when pressing down.
+                        const targetPipe = entitiesRef.current.find(e => e.id === entity.warpTarget);
+                        if (targetPipe) {
+                            entity.x = targetPipe.x + (targetPipe.w - entity.w)/2;
+                            entity.y = targetPipe.y + targetPipe.h * 0.3; // Inside pipe
+                            entity.warpState = 'exiting';
+                            entity.warpTimer = 0;
+                        } else {
+                            // No target, just abort
+                            entity.warpState = 'idle';
+                            entity.vy = -10; // Pop out
+                        }
+                    }
+                    return; // Skip physics
+                } else if (entity.warpState === 'exiting') {
+                     entity.y -= 1 * scaleRatio * delta; // Slide up
+                     entity.warpTimer = (entity.warpTimer || 0) + delta;
+                     if (entity.warpTimer > 40) {
+                         entity.warpState = 'idle';
+                         entity.vy = -5 * scaleRatio; // Pop out
+                     }
+                     return; // Skip physics
+                }
+            }
+
+            // Win Animation
+            if (isWonRef.current && entity.isPlayer) {
+                // Auto walk off screen
+                entity.vx = 2 * scaleRatio;
+                entity.x += entity.vx * delta;
+                entity.vy += phys.gravity * scaleRatio * delta; // Apply gravity so he falls to ground
+                handleTileCollision(entity, map, 'y'); // Collide with floor
+                
+                if (entity.x > map.width * tileSize + 100) {
+                     // Trigger UI
+                     onGameWon();
+                }
+                return;
+            }
+
+
             if (entity.isBullet) {
                 entity.x += entity.vx * delta;
-                if (entity.hasGravity) {
-                     entity.y += entity.vy * delta;
-                } else if (entity.bulletVariant === 'magic') {
-                    // Wavy motion
-                    entity.y += Math.sin(entity.x * 0.05) * 2;
-                } else {
-                    entity.y += entity.vy * delta; // Usually 0 or simple offset
-                }
+                if (entity.hasGravity) entity.y += entity.vy * delta;
+                else if (entity.bulletVariant === 'magic') entity.y += Math.sin(entity.x * 0.05) * 2;
+                else entity.y += entity.vy * delta; 
                 
                 if (entity.bulletVariant === 'banana') {
                     handleTileCollision(entity, map, 'y');
@@ -686,11 +779,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 
                 entities.forEach(other => {
                     if (other === entity || other.isDead) return;
-                    
                     const isFriendlyFire = (entity.isEnemy && other.isEnemy) || (!entity.isEnemy && other.isPlayer);
                     if (isFriendlyFire) return;
-                    
-                    if (other.isCollectible) return; // Bullets don't kill coins/powerups
+                    if (other.isCollectible) return; 
 
                     if (checkRectCollision(entity, other)) {
                         entity.isDead = true;
@@ -728,6 +819,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 }
 
                 if (entity.grounded && keys[controls.down]) {
+                     // Check for Pipe Entrance
+                     const standingPipe = entitiesRef.current.find(e => e.type === 'Pipe' && Math.abs((e.x + e.w/2) - (entity.x + entity.w/2)) < e.w * 0.5 && Math.abs((e.y) - (entity.y + entity.h)) < 5);
+                     
+                     if (standingPipe) {
+                         // Find a different pipe
+                         const target = entitiesRef.current.find(e => e.type === 'Pipe' && e !== standingPipe);
+                         if (target) {
+                             entity.warpState = 'entering';
+                             entity.warpTimer = 0;
+                             entity.warpTarget = target.id;
+                             entity.x = standingPipe.x + (standingPipe.w - entity.w)/2; // Center on pipe
+                             audioManager.playPowerup(); // Warp sound placeholder
+                             return;
+                         }
+                     }
+
                     if (!entity.isCrouching) {
                         entity.isCrouching = true;
                         const originalH = (entity.isBig ? HITBOXES.big.height : HITBOXES.small.height) * scaleRatio;
@@ -743,13 +850,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     }
                 }
 
-                if (Math.abs(entity.vx) > 0.1) {
-                    lastDirRef.current = Math.sign(entity.vx);
-                }
+                if (Math.abs(entity.vx) > 0.1) lastDirRef.current = Math.sign(entity.vx);
 
                 const jumpJustPressed = keys[controls.jump] && !prevKeys[controls.jump];
-                
-                // Jump Logic with specific forces
                 const jumpForce = charConfig.physics.jumpForce * scaleRatio;
 
                 if (entity.isInWater) {
@@ -768,7 +871,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                             audioManager.playJump();
                         }
                     } else {
-                        // Double Jump Logic for Shadow
                         if (jumpJustPressed && charConfig.physics.doubleJump && (entity.jumpCount || 0) < 1) {
                             entity.vy = jumpForce; 
                             entity.jumpCount = (entity.jumpCount || 0) + 1;
@@ -784,31 +886,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                         entity.shootCooldown = GAME_SETTINGS.shootCooldown; 
                     }
                 }
-                if (entity.shootCooldown && entity.shootCooldown > 0) {
-                    entity.shootCooldown -= delta;
-                }
+                if (entity.shootCooldown && entity.shootCooldown > 0) entity.shootCooldown -= delta;
                 if (entity.invincibleTimer && entity.invincibleTimer > 0) {
                     entity.invincibleTimer -= delta; 
                     if (entity.invincibleTimer < 0) entity.invincibleTimer = 0;
                 }
 
-                // Speed Cap
-                if (Math.abs(entity.vx) > moveSpeed * 3) {
-                     entity.vx *= 0.95;
-                } else if (Math.abs(entity.vx) > moveSpeed && !keys[controls.left] && !keys[controls.right]) {
-                    // Decay
-                } else {
+                if (Math.abs(entity.vx) > moveSpeed * 3) entity.vx *= 0.95;
+                else if (Math.abs(entity.vx) > moveSpeed && !keys[controls.left] && !keys[controls.right]) {}
+                else {
                     if (entity.vx > moveSpeed) entity.vx = moveSpeed;
                     if (entity.vx < -moveSpeed) entity.vx = -moveSpeed;
                 }
 
-                if (entity.y > map.height * tileSize) {
-                    die();
-                }
+                if (entity.y > map.height * tileSize) die();
             }
-
-            // Enemy Physics Update (Simplified)
-            // ...
 
             entity.x += entity.vx * delta;
             handleTileCollision(entity, map, 'x');
@@ -825,11 +917,27 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     if (checkRectCollision(entity, other)) {
                          const config = getElementByName(other.type);
                          
+                         if (other.type === 'Flagpole') {
+                             if (!isWonRef.current && other.flagProgress !== 1) {
+                                 isWonRef.current = true;
+                                 audioManager.playWin();
+                                 other.flagProgress = 0;
+                                 // Start Animation: flag goes down
+                                 const animateFlag = () => {
+                                     other.flagProgress = (other.flagProgress || 0) + 0.02;
+                                     // Slide player
+                                     entity.y += 2 * scaleRatio;
+                                     if (other.flagProgress < 1) requestAnimationFrame(animateFlag);
+                                 };
+                                 animateFlag();
+                             }
+                             return;
+                         }
+
                          // Spring Logic
                          if (other.type === 'Spring') {
-                             // Bounce if coming from above
                              if (entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.8) {
-                                 entity.vy = -20 * scaleRatio; // High bounce
+                                 entity.vy = -20 * scaleRatio; 
                                  entity.grounded = false;
                                  audioManager.playJump();
                                  return;
@@ -837,18 +945,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                          }
 
                          if (other.isEnemy) {
-                             if(entity.spikeImmunity && (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike')) {
-                                 // Ignore
-                                 return;
-                             }
-
-                             // Pop-up spike safety check
+                             if(entity.spikeImmunity && (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike')) return;
                              if (other.type === 'Pop-up Spike' && other.spikeState !== 'active') return;
                              
-                             // Stomp Logic
                              const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
-                             
-                             // Some enemies can't be stomped (Piranha, Spikes, Rotating)
                              const unStompable = ['Piranha Plant', 'Pop-up Spike', 'Rotating Spike', 'Lightning Trap', 'Boost Pad'].includes(other.type);
 
                              if(isStomp && !unStompable) {
@@ -861,14 +961,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                          } else if (other.isCollectible) {
                             other.isDead = true;
                             if(config?.attributes?.variant === 'grow') {
-                                // Instant Grow
                                 entity.isBig = true;
                                 const originalH = HITBOXES.big.height * scaleRatio;
                                 entity.y -= (originalH - entity.h);
                                 entity.h = originalH;
                             }
                             if(config?.attributes?.variant === 'fire') { 
-                                // Skill Unlock
                                 entity.isBig = true; 
                                 entity.canShoot = true; 
                                 const originalH = HITBOXES.big.height * scaleRatio;
@@ -879,7 +977,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                             }
                             audioManager.playCoin();
                          } else if (other.type === 'Boost Pad') {
-                             // Boost logic
                              entity.vx = Math.sign(entity.vx || 1) * (config?.attributes?.boostSpeed || 20) * scaleRatio;
                          }
                     }
@@ -891,36 +988,32 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
 
     // --- Rendering ---
-    
-    // Generic renderer that delegates to Character Config visual color, or uses specific draw logic
     const drawPlayer = (g: PIXI.Graphics, e: Entity) => {
         const colors = charConfig.visuals.colors;
         const x = e.x; const y = e.y; const w = e.w; const h = e.h;
         const isRight = lastDirRef.current > 0;
-        
-        // Backflip Visual: moving backward relative to facing
         const isBackwards = (e.vx > 0.5 && keysRef.current[controls.left]) || (e.vx < -0.5 && keysRef.current[controls.right]);
-        
         const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
         
-        // Body
+        // Blink if invincible
+        if (e.invincibleTimer && Math.floor(e.invincibleTimer / 4) % 2 === 0) return;
+        if (e.warpState === 'entering' || e.warpState === 'exiting') {
+            g.alpha = 0.5; // Fade during warp
+        } else {
+            g.alpha = 1;
+        }
+
         g.rect(tx(w*0.2, w*0.6), y + h*0.4, w*0.6, h*0.4).fill(colors.primary);
-        // Head
         g.circle(tx(w*0.5, 0), y + h*0.25, w*0.35).fill(colors.secondary);
-        
-        // Eye (Directional)
-        const eyeOffset = isBackwards ? -w*0.1 : w*0.1; // Shift eye if looking back
+        const eyeOffset = isBackwards ? -w*0.1 : w*0.1;
         g.circle(tx(w*0.5 + eyeOffset + w*0.15, 0), y + h*0.25, 2).fill(0x000000);
 
-        // Special visual per character
         if (character === 'shadow') {
-            // Scarf
             g.rect(tx(w*0.1, w*0.8), y+h*0.45, w*0.8, h*0.1).fill(colors.accent);
             if (Math.abs(e.vx) > 1) {
                 g.moveTo(tx(w*0.2,0), y+h*0.5).lineTo(tx(-w*0.5,0), y+h*0.3).stroke({width: 2, color: colors.accent});
             }
         } else if (character === 'stella') {
-             // Hat
              g.moveTo(tx(w*0.2,0), y+h*0.1).lineTo(tx(w*0.8,0), y+h*0.1).lineTo(tx(w*0.5,0), y-h*0.3).fill(colors.primary);
         }
     };

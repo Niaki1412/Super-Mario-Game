@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import * as PIXI from 'pixi.js';
 import { ElementConfig } from './types';
@@ -216,7 +217,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Spring',
       category: 'trigger',
       color: 0xD32F2F,
-      // Fixed: Solid true so characters can stand/bounce. Indestructible.
+      // Solid so characters can stand/bounce. Indestructible.
       attributes: { gravity: false, solid: true, bounceForce: -18, speed: 0, destructible: false },
       renderSVG: () => <SvgSpring />,
       renderPixi: (g, _l, x, y, w, h, data) => {
@@ -260,7 +261,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       renderSVG: () => <SvgLightning />,
       renderPixi: (g, _l, x, y, w, h) => {
           // Render larger (3x3 area roughly) but center on the object
-          // Since x,y is top-left, we'll draw overflowing
           const centerX = x + w/2;
           const centerY = y + h/2;
           const size = w * 1.5; // Radius
@@ -282,7 +282,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Pipe',
       category: 'terrain',
       color: 0x4CAF50,
-      // Fixed: Solid so monsters can't penetrate.
+      // Solid so monsters can't penetrate.
       attributes: { gravity: false, solid: true, speed: 0, destructible: false },
       renderSVG: () => <SvgPipe />,
       renderPixi: (g, _l, x, y, w, h) => {
@@ -646,14 +646,21 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     color: 0xFFFFFF,
     attributes: { gravity: false, win: true },
     renderSVG: () => <SvgFlagpole />,
-    renderPixi: (g, _l, x, y, w, h) => {
+    renderPixi: (g, _l, x, y, w, h, data) => {
         const poleH = h * 9;
         g.rect(x + w*0.2, y + h*0.8, w*0.6, h*0.2).fill(0x8B4513);
         g.rect(x + w*0.4, y - poleH + h, w*0.2, poleH).fill(0x708090);
         g.circle(x + w*0.5, y - poleH + h, w*0.15).fill(0xFFD700);
-        g.moveTo(x + w*0.6, y - poleH + h + h*0.5)
-         .lineTo(x + w*0.6 + w, y - poleH + h + h)
-         .lineTo(x + w*0.6, y - poleH + h + h*1.5)
+        
+        // Dynamic flag position based on progress
+        const flagProgress = data?.flagProgress ?? 0; // 0 = top, 1 = bottom
+        const startY = y - poleH + h + h*0.5;
+        const endY = y + h*0.5; // Bottom area
+        const currentFlagY = startY + (flagProgress * (endY - startY));
+
+        g.moveTo(x + w*0.6, currentFlagY)
+         .lineTo(x + w*0.6 + w, currentFlagY + h*0.5)
+         .lineTo(x + w*0.6, currentFlagY + h)
          .fill(0xFF0000);
     }
   },
