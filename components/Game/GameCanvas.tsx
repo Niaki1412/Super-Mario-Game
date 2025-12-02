@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle, Rect } from '../../types';
@@ -713,12 +712,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     entity.y += 1 * scaleRatio * delta; // Slide down
                     entity.warpTimer = (entity.warpTimer || 0) + delta;
                     if (entity.warpTimer > 60) {
-                        // Find target
-                        const pipes = entitiesRef.current.filter(e => e.type === 'Pipe');
-                        // Find nearest pipe that isn't the current one? Or just random other pipe?
-                        // Simple heuristic: Find pipe with index > current index, wrap around
-                        // To do this reliably, we need to know WHICH pipe we are standing on.
-                        // We set warpTarget when pressing down.
                         const targetPipe = entitiesRef.current.find(e => e.id === entity.warpTarget);
                         if (targetPipe) {
                             entity.x = targetPipe.x + (targetPipe.w - entity.w)/2;
@@ -823,9 +816,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                      const standingPipe = entitiesRef.current.find(e => e.type === 'Pipe' && Math.abs((e.x + e.w/2) - (entity.x + entity.w/2)) < e.w * 0.5 && Math.abs((e.y) - (entity.y + entity.h)) < 5);
                      
                      if (standingPipe) {
-                         // Find a different pipe
-                         const target = entitiesRef.current.find(e => e.type === 'Pipe' && e !== standingPipe);
-                         if (target) {
+                         // Find a different pipe (Cycle through sorted list)
+                         const allPipes = entitiesRef.current
+                            .filter(e => e.type === 'Pipe')
+                            .sort((a,b) => (a.y - b.y) || (a.x - b.x)); // Sort by Y then X
+                         
+                         if (allPipes.length > 1) {
+                             const currentIndex = allPipes.indexOf(standingPipe);
+                             const targetIndex = (currentIndex + 1) % allPipes.length;
+                             const target = allPipes[targetIndex];
+
                              entity.warpState = 'entering';
                              entity.warpTimer = 0;
                              entity.warpTarget = target.id;

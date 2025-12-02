@@ -39,7 +39,11 @@ export const Game: React.FC<GameProps> = ({
     const [gameOver, setGameOver] = useState(false);
     const [gameWon, setGameWon] = useState(false);
     const [controls, setControls] = useState(DEFAULT_CONTROLS);
-    const [character, setCharacter] = useState('mario');
+    
+    // Initialize character synchronously from localStorage to avoid flickering
+    const [character, setCharacter] = useState(() => {
+        return localStorage.getItem('SELECTED_CHARACTER') || 'mario';
+    });
 
     // Map Data State
     const [originalMap, setOriginalMap] = useState<GameMap | null>(() => {
@@ -51,12 +55,10 @@ export const Game: React.FC<GameProps> = ({
 
     // --- Init Configs ---
     useEffect(() => {
-        const saved = localStorage.getItem('MARIO_CONTROLS');
-        if (saved) {
-            try { setControls({ ...DEFAULT_CONTROLS, ...JSON.parse(saved) }); } catch(e) {}
+        const savedControls = localStorage.getItem('MARIO_CONTROLS');
+        if (savedControls) {
+            try { setControls({ ...DEFAULT_CONTROLS, ...JSON.parse(savedControls) }); } catch(e) {}
         }
-        const savedChar = localStorage.getItem('SELECTED_CHARACTER');
-        if (savedChar) setCharacter(savedChar);
     }, []);
 
     // --- URL Params Handling ---
@@ -110,7 +112,11 @@ export const Game: React.FC<GameProps> = ({
 
     const handleRetry = () => {
         if (originalMap) {
-            setCurrentMap(JSON.parse(JSON.stringify(originalMap)));
+            // Deep clone to reset state completely
+            const resetMap = JSON.parse(JSON.stringify(originalMap));
+            // Ensure tile array is fresh
+            resetMap.tiles = originalMap.tiles.map((row: number[]) => [...row]);
+            setCurrentMap(resetMap);
             setGameOver(false);
             setGameWon(false);
             setScore(0);
