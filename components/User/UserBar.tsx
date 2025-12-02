@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { User, LogOut, LogIn, UserPlus, X, Mail, Hash, ChevronDown, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { loginUser, registerUser, logoutUser, getUserProfile, UserOut } from '../../api';
 
 export const UserBar: React.FC = () => {
   const [user, setUser] = useState<{ username: string; token: string } | null>(null);
+  const location = useLocation();
+  const isGame = location.pathname === '/game';
   
   // Modal Visibility States
   const [showLogin, setShowLogin] = useState(false);
@@ -188,25 +191,24 @@ export const UserBar: React.FC = () => {
       `}</style>
 
       {/* Top Right Bar Container */}
-      <div className="fixed top-4 right-4 z-[100] flex flex-col items-end font-sans">
+      <div className={`fixed top-4 z-[100] flex flex-col items-end font-sans transition-all duration-300 ${isGame ? 'right-44' : 'right-4'}`}>
         {user ? (
           <div className="relative">
-              {/* User Trigger Button */}
+              {/* User Trigger Button - Circular Icon Only */}
               <button 
                   ref={buttonRef}
                   onClick={toggleProfile}
                   className={`
-                    flex items-center gap-3 pl-2 pr-4 py-1.5 rounded-full shadow-lg transition-all border
+                    flex items-center justify-center w-10 h-10 rounded-full shadow-lg transition-all border
                     ${showProfilePopover 
                         ? 'bg-gray-800 border-gray-600 ring-2 ring-blue-500/50' 
                         : 'bg-gray-800/90 backdrop-blur border-gray-700 hover:bg-gray-700 hover:border-gray-500'}
                   `}
+                  title={user.username}
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-inner">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-inner pointer-events-none">
                     {user.username.charAt(0).toUpperCase()}
                 </div>
-                <span className="font-semibold text-sm max-w-[100px] truncate text-gray-200">{user.username}</span>
-                <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${showProfilePopover ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Profile Popover (Google Style) */}
