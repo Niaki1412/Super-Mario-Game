@@ -51,6 +51,8 @@ export interface CharacterDef {
         spikeImmunity?: boolean;// Ability flag
         transform?: boolean;   // Wukong flag
     };
+    // Skill Type when obtaining fire flower
+    skillType: 'fireball' | 'banana' | 'shuriken' | 'magic' | 'cannon';
     // Visual Settings
     visuals: {
         icon: any; // SVG Component
@@ -74,6 +76,7 @@ export const CHARACTERS: Record<string, CharacterDef> = {
             moveSpeedMult: 1.0,
             jumpForce: -10, // Standard jump
         },
+        skillType: 'fireball',
         visuals: {
             icon: SvgMario,
             themeColor: 'from-red-500 to-red-700',
@@ -91,6 +94,7 @@ export const CHARACTERS: Record<string, CharacterDef> = {
             jumpForce: -11,
             transform: true
         },
+        skillType: 'banana',
         visuals: {
             icon: SvgWukong,
             themeColor: 'from-yellow-500 to-orange-600',
@@ -102,12 +106,13 @@ export const CHARACTERS: Record<string, CharacterDef> = {
         name: "Shadow",
         description: "A ninja who moves unseen.",
         stats: { speed: 10, jump: 7, difficulty: 8 },
-        abilityName: "Double Jump & Backflip",
+        abilityName: "Double Jump & Shuriken",
         physics: {
             moveSpeedMult: 1.4, // Very fast
             jumpForce: -9.5,    // Slightly lower base jump
             doubleJump: true    // Key ability
         },
+        skillType: 'shuriken',
         visuals: {
             icon: SvgNinja,
             themeColor: 'from-gray-800 to-black',
@@ -119,12 +124,13 @@ export const CHARACTERS: Record<string, CharacterDef> = {
         name: "Stella",
         description: "A mage who defies gravity.",
         stats: { speed: 4, jump: 10, difficulty: 5 },
-        abilityName: "Hover & Float",
+        abilityName: "Hover & Magic Bolt",
         physics: {
             moveSpeedMult: 0.8, // Slow
             jumpForce: -12,     // High jump
             canHover: true      // Key ability
         },
+        skillType: 'magic',
         visuals: {
             icon: SvgMage,
             themeColor: 'from-purple-600 to-pink-600',
@@ -142,6 +148,7 @@ export const CHARACTERS: Record<string, CharacterDef> = {
             jumpForce: -8,      // Low jump
             spikeImmunity: true // Key ability
         },
+        skillType: 'cannon',
         visuals: {
             icon: SvgTank,
             themeColor: 'from-slate-600 to-slate-800',

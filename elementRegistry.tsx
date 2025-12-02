@@ -38,7 +38,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Grass',
       category: 'terrain',
       color: 0x4CAF50,
-      attributes: { solid: true },
+      attributes: { solid: true, destructible: false },
       renderSVG: () => <SvgGrass />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y, w, h).fill(0x5D4037);
@@ -59,7 +59,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Snow',
       category: 'terrain',
       color: 0x90CAF9,
-      attributes: { solid: true, friction: 0.05 }, // Very slippery
+      attributes: { solid: true, friction: 0.05, destructible: false }, 
       renderSVG: () => <SvgSnow />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y, w, h).fill(0x90CAF9);
@@ -77,7 +77,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Water',
       category: 'terrain',
       color: 0x2196F3,
-      attributes: { solid: false, liquidType: 'water', friction: 0.8 },
+      attributes: { solid: false, liquidType: 'water', friction: 0.8, destructible: false },
       renderSVG: () => <SvgWater />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y, w, h).fill({color: 0x2196F3, alpha: 0.5});
@@ -94,7 +94,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Lava',
       category: 'terrain',
       color: 0xD32F2F,
-      attributes: { solid: false, liquidType: 'lava', lethal: true },
+      attributes: { solid: false, liquidType: 'lava', lethal: true, destructible: false },
       renderSVG: () => <SvgLava />,
       renderPixi: (g, _l, x, y, w, h) => {
           const t = Date.now() / 200;
@@ -175,7 +175,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Invisible Death Block',
     category: 'trigger',
     color: 0x800080,
-    attributes: { solid: false, lethal: true, variant: 'invisible' },
+    attributes: { solid: false, lethal: true, variant: 'invisible', destructible: false },
     renderSVG: () => <SvgInvisibleDeathBlock />,
     renderPixi: (g, labels, x, y, w, h) => {
         g.rect(x+2, y+2, w-4, h-4).stroke({ width: 2, color: 0x800080 });
@@ -216,8 +216,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Spring',
       category: 'trigger',
       color: 0xD32F2F,
-      // Fixed: Gravity false so it can be placed in air. Speed 0.
-      attributes: { gravity: false, solid: true, bounceForce: -18, speed: 0 },
+      // Fixed: Solid true so characters can stand/bounce. Indestructible.
+      attributes: { gravity: false, solid: true, bounceForce: -18, speed: 0, destructible: false },
       renderSVG: () => <SvgSpring />,
       renderPixi: (g, _l, x, y, w, h, data) => {
           g.rect(x + 4, y + h*0.8, w - 8, h*0.2).fill(0x333333);
@@ -238,7 +238,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Boost Pad',
       category: 'trigger',
       color: 0x00E676,
-      attributes: { gravity: false, solid: false, boostSpeed: 20 },
+      // Indestructible
+      attributes: { gravity: false, solid: false, boostSpeed: 20, destructible: false },
       renderSVG: () => <SvgBoostPad />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y + h*0.8, w, h*0.2).fill(0x333333);
@@ -255,16 +256,23 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Lightning Trap',
       category: 'enemy',
       color: 0xFFEB3B,
-      // Fixed: Static trap
-      attributes: { gravity: false, solid: false, lethal: true, speed: 0 },
+      attributes: { gravity: false, solid: false, lethal: true, speed: 0, destructible: false },
       renderSVG: () => <SvgLightning />,
       renderPixi: (g, _l, x, y, w, h) => {
-          g.circle(x + w/2, y + h/2, w/2).fill(0x212121);
+          // Render larger (3x3 area roughly) but center on the object
+          // Since x,y is top-left, we'll draw overflowing
+          const centerX = x + w/2;
+          const centerY = y + h/2;
+          const size = w * 1.5; // Radius
+          
           const t = Date.now() / 50;
           if (Math.floor(t) % 10 < 5) {
-              g.moveTo(x + w*0.6, y + h*0.1).lineTo(x + w*0.3, y + h*0.5).lineTo(x + w*0.5, y + h*0.5)
-               .lineTo(x + w*0.4, y + h*0.9).lineTo(x + w*0.7, y + h*0.4).lineTo(x + w*0.5, y + h*0.4)
-               .lineTo(x + w*0.6, y + h*0.1).fill(0xFFEB3B).stroke({width: 1, color: 0xF57F17});
+              g.moveTo(centerX, centerY - size).lineTo(centerX - size/2, centerY).lineTo(centerX + size/4, centerY)
+               .lineTo(centerX - size/4, centerY + size).lineTo(centerX + size/2, centerY - size/4).lineTo(centerX - size/4, centerY - size/4)
+               .lineTo(centerX, centerY - size).fill(0xFFEB3B).stroke({width: 2, color: 0xFFFFFF});
+               
+               // Glow
+               g.circle(centerX, centerY, size).fill({color: 0xFFEB3B, alpha: 0.2});
           }
       }
   },
@@ -274,8 +282,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Pipe',
       category: 'terrain',
       color: 0x4CAF50,
-      // Fixed: Static terrain object
-      attributes: { gravity: false, solid: true, speed: 0 },
+      // Fixed: Solid so monsters can't penetrate.
+      attributes: { gravity: false, solid: true, speed: 0, destructible: false },
       renderSVG: () => <SvgPipe />,
       renderPixi: (g, _l, x, y, w, h) => {
           g.rect(x, y, w, h*0.3).fill(0x4CAF50).stroke({width: 2, color: 0x1B5E20});
@@ -342,7 +350,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Flying Turtle',
       category: 'enemy',
       color: 0xFF4500,
-      // Flying enemy (Gravity False, but Moving)
+      // Flying enemy
       attributes: { points: 300, gravity: false, speed: 2 },
       renderSVG: () => <SvgFlyingTurtle />,
       renderPixi: (g, _l, x, y, w, h, data) => {
@@ -372,7 +380,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Bouncing Hopper',
       category: 'enemy',
       color: 0x4B0082,
-      // Dynamic jumping enemy
       attributes: { points: 200, gravity: true, speed: 1.5 },
       renderSVG: () => <SvgHopper />,
       renderPixi: (g, _l, x, y, w, h, data) => {
@@ -392,7 +399,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Fire Dino',
       category: 'enemy',
       color: 0xDC143C,
-      // Dynamic enemy
       attributes: { points: 500, gravity: true, speed: 0.5 },
       renderSVG: () => <SvgFireDino />,
       renderPixi: (g, _l, x, y, w, h, data) => {
@@ -422,7 +428,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Bob-omb',
       category: 'enemy',
       color: 0x000000,
-      // Dynamic enemy
       attributes: { points: 150, gravity: true, speed: 1.5, lethal: true },
       renderSVG: () => <SvgBomb />,
       renderPixi: (g, _l, x, y, w, h, data) => {
@@ -448,8 +453,8 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Piranha Plant',
     category: 'enemy',
     color: 0x008000,
-    // Fixed: Static enemy (doesn't walk or fall)
-    attributes: { points: 150, gravity: false, solid: true, speed: 0 },
+    // Fixed: Solid true.
+    attributes: { points: 150, gravity: false, solid: true, speed: 0, destructible: false },
     renderSVG: () => <SvgPiranhaPlant />,
     renderPixi: (g, _l, x, y, w, h, data) => {
         const offset = data?.plantOffset ?? -h * 0.8; 
@@ -470,16 +475,18 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Pop-up Spike',
       category: 'enemy',
       color: 0x888888,
-      // Fixed: Static Hazard
-      attributes: { points: 0, gravity: false, lethal: true, speed: 0 },
+      attributes: { points: 0, gravity: false, lethal: true, speed: 0, destructible: false },
       renderSVG: () => <SvgPopUpSpike />,
       renderPixi: (g, _l, x, y, w, h, data) => {
           g.rect(x, y + h*0.8, w, h*0.2).fill(0x555555);
           let state = data?.spikeState || 'active'; 
+          
           if (state !== 'hidden') {
+              // Warning shows small spikes, Active shows full spikes
               const spikeH = state === 'warning' ? h*0.2 : h*0.7;
               const baseY = y + h*0.8;
-              const color = 0x999999;
+              const color = state === 'warning' ? 0xFF5722 : 0x999999;
+              
               for(let i=0; i<3; i++) {
                   const sx = x + (w/3) * i;
                   g.moveTo(sx + 2, baseY)
@@ -496,8 +503,7 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
       name: 'Rotating Spike',
       category: 'enemy',
       color: 0x333333,
-      // Fixed: Static Base
-      attributes: { points: 0, gravity: false, lethal: true, speed: 0 },
+      attributes: { points: 0, gravity: false, lethal: true, speed: 0, destructible: false },
       renderSVG: () => <SvgRotatingSpike />,
       renderPixi: (g, _l, x, y, w, h, data) => {
           const cx = x + w/2;
@@ -521,11 +527,12 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Coin',
     category: 'collectible',
     color: 0xFFFF00,
-    attributes: { points: 50, gravity: false },
+    // Indestructible by bullets
+    attributes: { points: 50, gravity: false, destructible: false },
     renderSVG: () => <SvgCoin />,
     renderPixi: (g, _l, x, y, w, h) => {
-        g.ellipse(x + w/2, y + h/2, w*0.3, h*0.4).fill(0xFFFF00).stroke({ width: 2, color: 0xF57F17 });
-        g.ellipse(x + w/2, y + h/2, w*0.15, h*0.25).stroke({ width: 1, color: 0xFFF59D });
+        g.ellipse(x + w/2, y + h*0.5, w*0.3, h*0.4).fill(0xFFFF00).stroke({ width: 2, color: 0xF57F17 });
+        g.ellipse(x + w/2, y + h*0.5, w*0.15, h*0.25).stroke({ width: 1, color: 0xFFF59D });
     }
   },
   {
@@ -534,7 +541,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Mushroom',
     category: 'collectible',
     color: 0xFF4500,
-    // Item runs away
     attributes: { points: 1000, gravity: true, speed: 2, variant: 'grow' },
     renderSVG: () => <SvgMushroom />,
     renderPixi: (g, _l, x, y, w, h) => {
@@ -556,7 +562,6 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     name: 'Fire Mushroom',
     category: 'collectible',
     color: 0xFF8800,
-    // Item runs away
     attributes: { points: 1000, gravity: true, speed: 2, variant: 'fire' },
     renderSVG: () => <SvgFireMushroom />,
     renderPixi: (g, _l, x, y, w, h) => {
@@ -605,6 +610,19 @@ export const GAME_ELEMENTS_REGISTRY: RegistryItem[] = [
     renderPixi: (g, _l, x, y, w, h) => {
         g.circle(x + w/2, y + h/2, w/2).fill(0xFF4400);
         g.circle(x + w/2, y + h/2, w/4).fill(0xFFFF00);
+    }
+  },
+  {
+    id: 998, // Internal Visual Effect
+    type: 'object',
+    name: 'VisualEffect',
+    category: 'decoration',
+    color: 0xFFFF00,
+    attributes: { gravity: false, speed: 0 },
+    renderSVG: () => <SvgCoin />,
+    renderPixi: (g, _l, x, y, w, h, data) => {
+        // Simple coin pop animation
+        g.ellipse(x + w/2, y + h/2, w*0.3, h*0.4).fill(0xFFFF00);
     }
   },
   {

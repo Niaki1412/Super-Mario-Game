@@ -1,4 +1,5 @@
 
+
 // Map Data Structure
 export interface GameMap {
   width: number; // Width in tiles
@@ -138,7 +139,7 @@ export interface Entity extends Rect {
   scale?: number;
   
   // Bullet variant
-  bulletVariant?: 'fireball' | 'banana';
+  bulletVariant?: 'fireball' | 'banana' | 'shuriken' | 'magic' | 'cannon';
 }
 
 export interface Particle {

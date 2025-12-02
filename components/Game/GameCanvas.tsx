@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import { GameMap, Entity, Particle, Rect } from '../../types';
@@ -8,7 +9,7 @@ import { audioManager } from '../../audioManager';
 import { GAME_SETTINGS } from '../../gameSettings';
 
 interface ExtendedEntity extends Entity {
-    bulletVariant?: 'fireball' | 'banana';
+    visualLife?: number; // For visual effects like coin pop
 }
 
 interface GameCanvasProps {
@@ -186,7 +187,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 isPlayer: true, isBig: false, canShoot: false,
                 hasGravity: true, invincibleTimer: 0, shootCooldown: 0,
                 jumpCount: 0, isCrouching: false,
-                // New abilities state
                 spikeImmunity: charConfig.physics.spikeImmunity || false
             });
 
@@ -264,7 +264,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             audioManager.stopBGM();
             cleanup.then(clean => clean && clean());
         };
-    }, [mapData, width, height, character]); // Re-init if character changes
+    }, [mapData, width, height, character]);
 
 
     // --- Game Logic ---
@@ -286,6 +286,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
     };
 
+    const spawnVisualEffect = (x: number, y: number, variant: 'coin_pop') => {
+        entitiesRef.current.push({
+            id: `vfx-${Math.random()}`,
+            type: 'VisualEffect',
+            x: x, y: y, w: mapRef.current.tileSize, h: mapRef.current.tileSize,
+            vx: 0, vy: -5,
+            isDead: false, grounded: false,
+            hasGravity: true,
+            visualLife: 30
+        } as ExtendedEntity);
+    };
+
     const die = () => {
         if (isGameOverRef.current || isWonRef.current) return;
         isGameOverRef.current = true;
@@ -303,18 +315,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const takeDamage = (entity: Entity) => {
         if (entity.invincibleTimer && entity.invincibleTimer > 0) return;
         if (isGameOverRef.current || isWonRef.current) return;
-
-        // Spike Immunity check for Iron
-        if (entity.spikeImmunity) {
-            // Verify source? Simplified: if immunity is true, player is tough.
-            // But maybe still take knockback? For now, simple immunity.
-            // If we want it only for spikes, we'd need to know the damage source. 
-            // In current physics, we just call takeDamage when touching hazard.
-            // Let's assume immunity covers spikes and enemies for now, or just ignore dmg.
-            // However, falling in pit should still kill. (Handled by y check).
-            // Let's reduce damage to just knockback for Mech? Or just ignore.
-            // Let's make it lose powerup but not die if small.
-        }
 
         if (entity.isBig) {
             entity.isBig = false;
@@ -335,10 +335,48 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const scaleRatio = tileSize / 32;
         
         const dir = source.vx !== 0 ? Math.sign(source.vx) : lastDirRef.current;
-        const isWukong = character === 'wukong';
+        const variant = isPlayerBullet ? charConfig.skillType : 'fireball';
         
-        const variant = isPlayerBullet ? (isWukong ? 'banana' : 'fireball') : 'fireball';
-        
+        // Character specific bullet properties
+        let gravity = true;
+        let vy = 0;
+        let speed = COMMON_PHYSICS.bulletSpeed;
+
+        if (variant === 'banana') {
+            vy = -4; // Arc up
+        } else if (variant === 'shuriken') {
+            gravity = false; // Straight line
+            speed = 12; 
+        } else if (variant === 'magic') {
+            gravity = false;
+            speed = 5;
+        } else if (variant === 'cannon') {
+            vy = -2; // Heavy
+            speed = 6;
+        }
+
+        if (variant === 'shuriken') {
+            // Spawn 3 shurikens spread
+            [-1, 0, 1].forEach(offsetY => {
+                 entitiesRef.current.push({
+                    id: `bullet-${Math.random()}`,
+                    type: 'Bullet',
+                    x: source.x + (dir > 0 ? source.w : -COMMON_PHYSICS.projectileSize.width * scaleRatio),
+                    y: source.y + source.h * 0.4,
+                    w: COMMON_PHYSICS.projectileSize.width * scaleRatio,
+                    h: COMMON_PHYSICS.projectileSize.height * scaleRatio,
+                    vx: dir * speed * scaleRatio,
+                    vy: offsetY * 2,
+                    isDead: false, grounded: false, isBullet: true,
+                    isEnemy: !isPlayerBullet,
+                    bulletVariant: variant,
+                    hasGravity: false
+                } as ExtendedEntity);
+            });
+            audioManager.playShoot();
+            return;
+        }
+
         entitiesRef.current.push({
             id: `bullet-${Math.random()}`,
             type: 'Bullet',
@@ -346,12 +384,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             y: source.y + source.h * 0.4,
             w: COMMON_PHYSICS.projectileSize.width * scaleRatio,
             h: COMMON_PHYSICS.projectileSize.height * scaleRatio,
-            vx: dir * (isPlayerBullet ? COMMON_PHYSICS.bulletSpeed : 3) * scaleRatio,
-            vy: isWukong ? -4 : 0,
+            vx: dir * speed * scaleRatio,
+            vy: vy,
             isDead: false, grounded: false, isBullet: true,
             isEnemy: !isPlayerBullet,
             bulletVariant: variant,
-            hasGravity: isWukong
+            hasGravity: gravity
         } as ExtendedEntity);
         
         audioManager.playShoot();
@@ -443,7 +481,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                          entity.x = right * tileSize - entity.w;
                          if (entity.isEnemy) entity.vx = -Math.abs(entity.vx);
                          else entity.vx = 0;
-                         if (!entity.isEnemy && entity.isBullet) { entity.isDead = true; spawnParticles(entity.x + entity.w, entity.y, 0xFFD700); }
+                         if (!entity.isEnemy && entity.isBullet && entity.bulletVariant !== 'banana' && entity.bulletVariant !== 'magic') { 
+                             entity.isDead = true; spawnParticles(entity.x + entity.w, entity.y, 0xFFD700); 
+                         }
                          return;
                      }
                 }
@@ -461,7 +501,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                         entity.x = (left + 1) * tileSize;
                         if (entity.isEnemy) entity.vx = Math.abs(entity.vx);
                         else entity.vx = 0;
-                        if (!entity.isEnemy && entity.isBullet) { entity.isDead = true; spawnParticles(entity.x, entity.y, 0xFFD700); }
+                         if (!entity.isEnemy && entity.isBullet && entity.bulletVariant !== 'banana' && entity.bulletVariant !== 'magic') { 
+                            entity.isDead = true; spawnParticles(entity.x, entity.y, 0xFFD700); 
+                         }
                         return;
                     }
                 }
@@ -481,7 +523,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                             if (entity.isPlayer) takeDamage(entity);
                             else if (!entity.isBullet) entity.isDead = true; 
                         }
-                        if (entity.isBullet) { entity.isDead = true; spawnParticles(entity.x, entity.y + entity.h, 0xFFD700); }
+                        // Bullet bounce logic or destroy
+                        if (entity.isBullet) { 
+                            if(entity.bulletVariant === 'fireball' || entity.bulletVariant === 'cannon') {
+                                entity.vy = -3; // Bounce
+                            } else {
+                                entity.isDead = true; spawnParticles(entity.x, entity.y + entity.h, 0xFFD700); 
+                            }
+                        }
                         return;
                     }
                     if (isLethalTile(tileId) && !entity.spikeImmunity) {
@@ -508,6 +557,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                                 map.tiles[top][x] = 6; 
                                 addScore(100);
                                 audioManager.playCoin();
+                                spawnVisualEffect(x * tileSize, (top-1) * tileSize, 'coin_pop');
                             } else {
                                 audioManager.playBump();
                             }
@@ -529,10 +579,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const prevKeys = prevKeysRef.current;
         const tileSize = map.tileSize;
         const scaleRatio = tileSize / 32;
+        const currentTime = Date.now();
         
         const phys = COMMON_PHYSICS;
 
         entitiesRef.current = entities.filter(e => {
+            if (e.type === 'VisualEffect') {
+                if(e.visualLife && e.visualLife > 0) return true;
+                return false;
+            }
             if (e.isDead && !e.isPlayer) return false;
             if (e.isEffect && e.vy > 5) return false; 
             if (e.isBullet && (e.x < 0 || e.x > map.width * tileSize || e.y > map.height * tileSize)) return false;
@@ -549,8 +604,40 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
 
         entitiesRef.current.forEach(entity => {
+            // Visual Effect Logic
+            if (entity.type === 'VisualEffect') {
+                entity.y += entity.vy * delta;
+                entity.visualLife = (entity.visualLife || 0) - delta;
+                return;
+            }
+
             if (entity.isDead && !entity.isPlayer) return;
             if (entity.type === 'CustomImage') return;
+
+            // --- Entity Logic Updates (Animations/AI) ---
+            if (entity.type === 'Pop-up Spike') {
+                entity.spikeTimer = (entity.spikeTimer || 0) + delta;
+                if (!entity.spikeState) entity.spikeState = 'active';
+                
+                // Cycle: Hidden (2s) -> Warning (1s) -> Active (2s)
+                if (entity.spikeState === 'hidden' && entity.spikeTimer > 120) {
+                    entity.spikeState = 'warning';
+                    entity.spikeTimer = 0;
+                } else if (entity.spikeState === 'warning' && entity.spikeTimer > 60) {
+                    entity.spikeState = 'active';
+                    entity.spikeTimer = 0;
+                } else if (entity.spikeState === 'active' && entity.spikeTimer > 120) {
+                    entity.spikeState = 'hidden';
+                    entity.spikeTimer = 0;
+                }
+            } else if (entity.type === 'Rotating Spike') {
+                entity.rotationAngle = (entity.rotationAngle || 0) + 0.05 * delta;
+            } else if (entity.type === 'Piranha Plant') {
+                entity.plantTimer = (entity.plantTimer || 0) + 0.03 * delta;
+                // Move up and down smoothly
+                const maxOffset = entity.h * 0.8;
+                entity.plantOffset = -Math.abs(Math.sin(entity.plantTimer) * maxOffset);
+            }
 
             // -- Gravity & Hover Physics --
             if (entity.hasGravity) {
@@ -576,9 +663,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
             if (entity.isBullet) {
                 entity.x += entity.vx * delta;
-                if (entity.bulletVariant === 'banana') {
-                    entity.y += entity.vy * delta;
+                if (entity.hasGravity) {
+                     entity.y += entity.vy * delta;
+                } else if (entity.bulletVariant === 'magic') {
+                    // Wavy motion
+                    entity.y += Math.sin(entity.x * 0.05) * 2;
                 } else {
+                    entity.y += entity.vy * delta; // Usually 0 or simple offset
+                }
+                
+                if (entity.bulletVariant === 'banana') {
+                    handleTileCollision(entity, map, 'y');
+                    handleTileCollision(entity, map, 'x');
+                } else if (entity.bulletVariant !== 'shuriken' && entity.bulletVariant !== 'magic') {
                     const tile = getTileAt(entity.x + entity.w/2, entity.y + entity.h/2, map);
                     if (isSolid(tile)) {
                         entity.isDead = true;
@@ -587,16 +684,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                     }
                 }
                 
-                if (entity.bulletVariant === 'banana') {
-                    handleTileCollision(entity, map, 'y');
-                    handleTileCollision(entity, map, 'x');
-                }
-
                 entities.forEach(other => {
                     if (other === entity || other.isDead) return;
                     
                     const isFriendlyFire = (entity.isEnemy && other.isEnemy) || (!entity.isEnemy && other.isPlayer);
                     if (isFriendlyFire) return;
+                    
+                    if (other.isCollectible) return; // Bullets don't kill coins/powerups
 
                     if (checkRectCollision(entity, other)) {
                         entity.isDead = true;
@@ -713,14 +807,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 }
             }
 
-            // Enemy Physics Update (Simplified for brevity as they are mostly consistent)
-            if (entity.isEnemy) {
-                 // Standard enemy logic...
-                 if (entity.type === 'Piranha Plant' || entity.type === 'Pop-up Spike') {
-                     // ... existing logic ...
-                 } 
-                 // Basic AI for patrols
-            }
+            // Enemy Physics Update (Simplified)
+            // ...
 
             entity.x += entity.vx * delta;
             handleTileCollision(entity, map, 'x');
@@ -732,21 +820,38 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             // Collision with other entities
             if (entity.isPlayer && !entity.isDead) {
                 entitiesRef.current.forEach(other => {
-                    if (entity === other || other.isDead || other.isEffect || other.isBullet || other.type === 'CustomImage') return;
+                    if (entity === other || other.isDead || other.isEffect || other.isBullet || other.type === 'CustomImage' || other.type === 'VisualEffect') return;
 
                     if (checkRectCollision(entity, other)) {
-                        // ... interaction logic ...
                          const config = getElementByName(other.type);
                          
+                         // Spring Logic
+                         if (other.type === 'Spring') {
+                             // Bounce if coming from above
+                             if (entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.8) {
+                                 entity.vy = -20 * scaleRatio; // High bounce
+                                 entity.grounded = false;
+                                 audioManager.playJump();
+                                 return;
+                             }
+                         }
+
                          if (other.isEnemy) {
                              if(entity.spikeImmunity && (other.type === 'Pop-up Spike' || other.type === 'Rotating Spike')) {
                                  // Ignore
                                  return;
                              }
+
+                             // Pop-up spike safety check
+                             if (other.type === 'Pop-up Spike' && other.spikeState !== 'active') return;
                              
                              // Stomp Logic
                              const isStomp = entity.vy > 0 && entity.y + entity.h < other.y + other.h * 0.7;
-                             if(isStomp) {
+                             
+                             // Some enemies can't be stomped (Piranha, Spikes, Rotating)
+                             const unStompable = ['Piranha Plant', 'Pop-up Spike', 'Rotating Spike', 'Lightning Trap', 'Boost Pad'].includes(other.type);
+
+                             if(isStomp && !unStompable) {
                                  other.isDead = true; 
                                  entity.vy = phys.bounceForce * scaleRatio;
                                  audioManager.playStomp();
@@ -755,9 +860,27 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                              }
                          } else if (other.isCollectible) {
                             other.isDead = true;
-                            if(config?.attributes?.variant === 'grow') entity.isBig = true;
-                            if(config?.attributes?.variant === 'fire') { entity.isBig = true; entity.canShoot = true; }
+                            if(config?.attributes?.variant === 'grow') {
+                                // Instant Grow
+                                entity.isBig = true;
+                                const originalH = HITBOXES.big.height * scaleRatio;
+                                entity.y -= (originalH - entity.h);
+                                entity.h = originalH;
+                            }
+                            if(config?.attributes?.variant === 'fire') { 
+                                // Skill Unlock
+                                entity.isBig = true; 
+                                entity.canShoot = true; 
+                                const originalH = HITBOXES.big.height * scaleRatio;
+                                if(entity.h < originalH) {
+                                    entity.y -= (originalH - entity.h);
+                                    entity.h = originalH;
+                                }
+                            }
                             audioManager.playCoin();
+                         } else if (other.type === 'Boost Pad') {
+                             // Boost logic
+                             entity.vx = Math.sign(entity.vx || 1) * (config?.attributes?.boostSpeed || 20) * scaleRatio;
                          }
                     }
                 });
@@ -777,9 +900,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         
         // Backflip Visual: moving backward relative to facing
         const isBackwards = (e.vx > 0.5 && keysRef.current[controls.left]) || (e.vx < -0.5 && keysRef.current[controls.right]);
-        
-        // Simple Sprite drawing based on rects for now, colored by character theme
-        // Ideally we would import specific draw functions, but for this refactor we reuse a generic body shape colored differently
         
         const tx = (lx: number, fw: number) => isRight ? (x + lx) : (x + w - lx - fw);
         
